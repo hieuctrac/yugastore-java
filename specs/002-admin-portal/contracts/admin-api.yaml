@@ -1,0 +1,1021 @@
+openapi: 3.0.3
+info:
+  title: YugaStore Admin Portal API
+  description: |
+    REST API for the YugaStore Admin Portal, enabling authorized personnel to manage
+    the product catalog with comprehensive CRUD operations, role-based access control,
+    and audit logging.
+  version: 1.0.0
+  contact:
+    name: YugaStore Team
+    email: team@yugastore.com
+
+servers:
+  - url: http://localhost:8084/api/admin
+    description: Local development server
+  - url: https://yugastore.com/api/admin
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: Admin user authentication and session management
+  - name: Products
+    description: Product catalog management operations
+  - name: Bulk Operations
+    description: Bulk product update operations
+  - name: Audit
+    description: Audit log and change history
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Admin user login
+      description: Authenticate admin user and issue JWT token
+      security: []  # No auth required for login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Admin user logout
+      description: Invalidate current JWT token (client-side token removal)
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user info
+      description: Retrieve authenticated admin user details
+      responses:
+        '200':
+          description: User info retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDto'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List products with filters and pagination
+      description: Retrieve product list with optional filtering, sorting, and pagination
+      parameters:
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          description: Page size
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: search
+          in: query
+          description: Search by ASIN or product name (partial match)
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          description: Filter by minimum price
+          schema:
+            type: number
+            format: double
+        - name: maxPrice
+          in: query
+          description: Filter by maximum price
+          schema:
+            type: number
+            format: double
+        - name: stockStatus
+          in: query
+          description: Filter by stock status
+          schema:
+            type: string
+            enum: [IN_STOCK, LOW_STOCK, OUT_OF_STOCK]
+        - name: isActive
+          in: query
+          description: Filter by active/inactive status
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [asin, title, price, quantity, category]
+            default: asin
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Product list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Products
+      summary: Create new product
+      description: Add a new product to the catalog (Admin and Editor roles only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreateRequest'
+      responses:
+        '201':
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
+        '400':
+          description: Validation error or duplicate ASIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions (Viewer role)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/{asin}:
+    get:
+      tags:
+        - Products
+      summary: Get product by ASIN
+      description: Retrieve detailed product information
+      parameters:
+        - name: asin
+          in: path
+          required: true
+          description: Product ASIN
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Products
+      summary: Update product
+      description: Update all product fields (Admin and Editor roles only)
+      parameters:
+        - name: asin
+          in: path
+          required: true
+          description: Product ASIN
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdateRequest'
+      responses:
+        '200':
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Concurrent modification detected (version mismatch)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConcurrencyErrorResponse'
+
+    delete:
+      tags:
+        - Products
+      summary: Permanently delete product
+      description: Hard delete product (Admin role only, must be inactive, checks for cart/order references)
+      parameters:
+        - name: asin
+          in: path
+          required: true
+          description: Product ASIN
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  description: Reason for deletion (required)
+                  example: "Discontinued product, no longer available"
+      responses:
+        '200':
+          description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Product deleted successfully"
+        '400':
+          description: Product is active (must deactivate first) or in active cart/pending order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions (only Admin can delete)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/{asin}/deactivate:
+    patch:
+      tags:
+        - Products
+      summary: Deactivate product (soft delete)
+      description: Mark product as inactive (Admin and Editor roles)
+      parameters:
+        - name: asin
+          in: path
+          required: true
+          description: Product ASIN
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/{asin}/activate:
+    patch:
+      tags:
+        - Products
+      summary: Reactivate product
+      description: Restore inactive product to active status (Admin and Editor roles)
+      parameters:
+        - name: asin
+          in: path
+          required: true
+          description: Product ASIN
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product reactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDto'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/bulk-update:
+    post:
+      tags:
+        - Bulk Operations
+      summary: Bulk update products
+      description: Apply updates to multiple products asynchronously (Admin and Editor roles)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUpdateRequest'
+      responses:
+        '202':
+          description: Bulk operation accepted and processing asynchronously
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkOperationResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /products/bulk-deactivate:
+    post:
+      tags:
+        - Bulk Operations
+      summary: Bulk deactivate products
+      description: Deactivate multiple products at once (Admin and Editor roles)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - asins
+              properties:
+                asins:
+                  type: array
+                  items:
+                    type: string
+                  example: ["ASIN123", "ASIN456", "ASIN789"]
+      responses:
+        '202':
+          description: Bulk deactivation accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkOperationResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /jobs/{jobId}:
+    get:
+      tags:
+        - Bulk Operations
+      summary: Get bulk operation status
+      description: Poll for status of async bulk operation
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          description: Bulk operation job ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkJobStatus'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /audit/products/{asin}:
+    get:
+      tags:
+        - Audit
+      summary: Get product change history
+      description: Retrieve all audit log entries for a specific product
+      parameters:
+        - name: asin
+          in: path
+          required: true
+          description: Product ASIN
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          description: Page size
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Audit logs retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /audit/logs:
+    get:
+      tags:
+        - Audit
+      summary: Get audit logs with filters
+      description: Retrieve audit logs across all products with filtering
+      parameters:
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          description: Page size
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: userId
+          in: query
+          description: Filter by admin user ID
+          schema:
+            type: string
+            format: uuid
+        - name: actionType
+          in: query
+          description: Filter by action type
+          schema:
+            type: string
+            enum: [CREATE, UPDATE, DELETE, DEACTIVATE, ACTIVATE, BULK_UPDATE]
+        - name: fromDate
+          in: query
+          description: Filter from date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: toDate
+          in: query
+          description: Filter to date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: productAsin
+          in: query
+          description: Filter by product ASIN
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit logs retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "admin"
+        password:
+          type: string
+          format: password
+          example: "SecureP@ss123"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        expiresIn:
+          type: integer
+          description: Token expiration time in seconds
+          example: 1800
+        user:
+          $ref: '#/components/schemas/AdminUserDto'
+
+    AdminUserDto:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        username:
+          type: string
+          example: "admin"
+        role:
+          type: string
+          enum: [ADMIN, EDITOR, VIEWER]
+          example: "ADMIN"
+        email:
+          type: string
+          format: email
+          example: "admin@yugastore.com"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-15T10:30:00Z"
+        lastLogin:
+          type: string
+          format: date-time
+          example: "2026-01-27T14:00:00Z"
+
+    ProductDto:
+      type: object
+      properties:
+        asin:
+          type: string
+          example: "B01N5IB20Q"
+        title:
+          type: string
+          example: "The Great Gatsby"
+        category:
+          type: string
+          example: "Fiction"
+        author:
+          type: string
+          example: "F. Scott Fitzgerald"
+        price:
+          type: number
+          format: double
+          example: 12.99
+        description:
+          type: string
+          example: "A classic American novel"
+        longDescription:
+          type: string
+          example: "The Great Gatsby is a 1925 novel by American writer F. Scott Fitzgerald..."
+        imageUrl:
+          type: string
+          format: uri
+          example: "https://images.example.com/gatsby.jpg"
+        quantity:
+          type: integer
+          example: 150
+        isActive:
+          type: boolean
+          example: true
+        deactivatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deactivatedBy:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+          example: 5
+
+    ProductCreateRequest:
+      type: object
+      required:
+        - asin
+        - title
+        - category
+        - author
+        - price
+      properties:
+        asin:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: "B01N5IB20Q"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: "The Great Gatsby"
+        category:
+          type: string
+          example: "Fiction"
+        author:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "F. Scott Fitzgerald"
+        price:
+          type: number
+          format: double
+          minimum: 0.01
+          maximum: 99999.99
+          example: 12.99
+        description:
+          type: string
+          maxLength: 1000
+          example: "A classic American novel"
+        longDescription:
+          type: string
+          maxLength: 5000
+          example: "The Great Gatsby is a 1925 novel..."
+        imageUrl:
+          type: string
+          format: uri
+          example: "https://images.example.com/gatsby.jpg"
+        quantity:
+          type: integer
+          minimum: 0
+          maximum: 999999
+          default: 0
+          example: 150
+
+    ProductUpdateRequest:
+      type: object
+      required:
+        - title
+        - category
+        - author
+        - price
+        - version
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: "The Great Gatsby - Revised Edition"
+        category:
+          type: string
+          example: "Fiction"
+        author:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: "F. Scott Fitzgerald"
+        price:
+          type: number
+          format: double
+          minimum: 0.01
+          maximum: 99999.99
+          example: 14.99
+        description:
+          type: string
+          maxLength: 1000
+          example: "A classic American novel - Now with new introduction"
+        longDescription:
+          type: string
+          maxLength: 5000
+        imageUrl:
+          type: string
+          format: uri
+        quantity:
+          type: integer
+          minimum: 0
+          maximum: 999999
+          example: 200
+        version:
+          type: integer
+          description: Current version for optimistic locking
+          example: 5
+
+    ProductListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductDto'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 25
+        totalElements:
+          type: integer
+          example: 1250
+        totalPages:
+          type: integer
+          example: 50
+
+    BulkUpdateRequest:
+      type: object
+      required:
+        - asins
+        - operation
+      properties:
+        asins:
+          type: array
+          items:
+            type: string
+          example: ["ASIN123", "ASIN456", "ASIN789"]
+        operation:
+          type: string
+          enum: [UPDATE_CATEGORY, ADJUST_PRICE, DEACTIVATE]
+          example: "UPDATE_CATEGORY"
+        parameters:
+          type: object
+          description: Operation-specific parameters
+          example:
+            category: "Science Fiction"
+            priceAdjustmentPercentage: 10.0
+
+    BulkOperationResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+          example: "987e6543-e89b-12d3-a456-426614174111"
+        message:
+          type: string
+          example: "Bulk operation accepted and processing"
+        statusUrl:
+          type: string
+          format: uri
+          example: "/api/admin/jobs/987e6543-e89b-12d3-a456-426614174111"
+
+    BulkJobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+          example: "987e6543-e89b-12d3-a456-426614174111"
+        status:
+          type: string
+          enum: [IN_PROGRESS, COMPLETED, FAILED]
+          example: "IN_PROGRESS"
+        totalProducts:
+          type: integer
+          example: 100
+        processedProducts:
+          type: integer
+          example: 50
+        successfulUpdates:
+          type: integer
+          example: 45
+        failedUpdates:
+          type: integer
+          example: 5
+        failures:
+          type: array
+          items:
+            type: object
+            properties:
+              asin:
+                type: string
+              reason:
+                type: string
+          example:
+            - asin: "ASIN123"
+              reason: "Product not found"
+
+    AuditLogDto:
+      type: object
+      properties:
+        auditId:
+          type: integer
+          format: int64
+          example: 12345
+        productAsin:
+          type: string
+          example: "B01N5IB20Q"
+        userId:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        username:
+          type: string
+          example: "admin"
+        actionType:
+          type: string
+          enum: [CREATE, UPDATE, DELETE, DEACTIVATE, ACTIVATE, BULK_UPDATE]
+          example: "UPDATE"
+        fieldName:
+          type: string
+          nullable: true
+          example: "price"
+        oldValue:
+          type: string
+          nullable: true
+          example: "12.99"
+        newValue:
+          type: string
+          nullable: true
+          example: "14.99"
+        reason:
+          type: string
+          nullable: true
+          example: "Price adjustment for promotion"
+        ipAddress:
+          type: string
+          example: "192.168.1.100"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-27T14:30:00Z"
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogDto'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 50
+        totalElements:
+          type: integer
+          example: 500
+        totalPages:
+          type: integer
+          example: 10
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-27T14:00:00Z"
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Validation failed for product creation"
+        details:
+          type: array
+          items:
+            type: string
+          example:
+            - "ASIN must be unique"
+            - "Price must be positive"
+
+    ConcurrencyErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 409
+        error:
+          type: string
+          example: "Conflict"
+        message:
+          type: string
+          example: "Product was modified by another user"
+        modifiedBy:
+          type: string
+          example: "editor_user"
+        modifiedAt:
+          type: string
+          format: date-time
+          example: "2026-01-27T13:55:00Z"
+        currentVersion:
+          type: integer
+          example: 6
