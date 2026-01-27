@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:agentcmd.dev)",
+      "WebFetch(domain:www.task-master.dev)",
+      "WebFetch(domain:tessl.io)",
+      "Bash(gh api:*)",
+      "Bash(git checkout:*)",
+      "Bash(git fetch:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
