@@ -46,7 +46,6 @@ YugaStore currently lacks administrative tooling for product catalog management.
 ### 2.2 Success Metrics
 - **Time to Update:** < 2 minutes to update any product field
 - **Error Rate:** < 1% failed product updates due to validation errors
-- **Adoption:** 100% of product updates performed through admin portal within 30 days
 - **User Satisfaction:** > 4.0/5.0 satisfaction rating from admin users
 - **Support Reduction:** 80% reduction in product management support requests to engineering
 
@@ -69,9 +68,26 @@ YugaStore currently lacks administrative tooling for product catalog management.
 
 ## 4. User Stories
 
-### 4.1 Product Update Stories
+### 4.1 Product Management Stories
 
-**US-1: Update Product Price**
+**US-1: Add New Product**
+```
+As a Merchandising Manager
+I want to add new products to the catalog
+So that I can expand our product offerings
+
+Acceptance Criteria:
+- I can access "Add Product" form from admin portal
+- I can enter all required product fields (ASIN, title, category, price, author)
+- I can enter optional fields (description, long description, image URL, quantity)
+- Form validates all fields before submission
+- ASIN uniqueness is enforced (error if duplicate)
+- Successfully created product appears in product list immediately
+- Product is active by default and visible to customers
+- I see confirmation message with link to view/edit new product
+```
+
+**US-2: Update Product Price**
 ```
 As a Commerce Operations Lead
 I want to update product prices individually
@@ -85,7 +101,7 @@ Acceptance Criteria:
 - Price change is reflected immediately in the storefront
 ```
 
-**US-2: Update Product Description**
+**US-3: Update Product Description**
 ```
 As a Merchandising Manager
 I want to update product descriptions and details
@@ -98,7 +114,7 @@ Acceptance Criteria:
 - Changes are immediately visible to customers
 ```
 
-**US-3: Update Product Images**
+**US-4: Update Product Images**
 ```
 As a Merchandising Manager
 I want to update product image URLs
@@ -111,7 +127,7 @@ Acceptance Criteria:
 - Broken image links are visually indicated
 ```
 
-**US-4: Update Product Inventory**
+**US-5: Update Product Inventory**
 ```
 As a Commerce Operations Lead
 I want to update product quantity in stock
@@ -123,7 +139,7 @@ Acceptance Criteria:
 - Inventory changes are reflected in product availability immediately
 ```
 
-**US-5: Update Product Category**
+**US-6: Update Product Category**
 ```
 As a Merchandising Manager
 I want to recategorize products
@@ -137,7 +153,7 @@ Acceptance Criteria:
 
 ### 4.2 Product Deletion Stories
 
-**US-6: Soft Delete Product**
+**US-7: Soft Delete Product**
 ```
 As a Commerce Operations Lead
 I want to deactivate products without permanent deletion
@@ -151,7 +167,7 @@ Acceptance Criteria:
 - Historical orders still show product details
 ```
 
-**US-7: Permanent Product Deletion**
+**US-8: Permanent Product Deletion**
 ```
 As a Commerce Operations Lead
 I want to permanently delete products (with safeguards)
@@ -167,7 +183,7 @@ Acceptance Criteria:
 
 ### 4.3 Supporting Stories
 
-**US-8: Product Search and Filter**
+**US-9: Product Search and Filter**
 ```
 As an Admin User
 I want to search and filter products
@@ -180,7 +196,7 @@ Acceptance Criteria:
 - Results show key product info (ASIN, name, price, stock, status)
 ```
 
-**US-9: Bulk Product Updates**
+**US-10: Bulk Product Updates**
 ```
 As a Commerce Operations Lead
 I want to update multiple products at once
@@ -194,7 +210,7 @@ Acceptance Criteria:
 - Confirmation shows number of products affected
 ```
 
-**US-10: Audit Trail**
+**US-11: Audit Trail**
 ```
 As a Commerce Operations Lead
 I want to see history of product changes
@@ -246,30 +262,43 @@ Acceptance Criteria:
 - Delete button for each product (with confirmation)
 - Quick view modal for product details
 
-### 5.3 Product Update Operations
+### 5.3 Product Creation and Update Operations
 
-**FR-3.1:** Product edit form
+**FR-3.1:** Product creation form
+- "Add Product" button accessible from product list page
+- Form includes all product fields with clear labels
+- Required fields marked with asterisk: ASIN, title, category, price, author
+- Optional fields: description, long description, image URL, quantity (defaults to 0)
+- Real-time validation with inline error messages
+- Image URL preview available
+- Cancel button returns to product list
+- Save button creates product and redirects to product list or edit page
+- Duplicate ASIN validation with clear error message
+- New products set as active by default
+
+**FR-3.2:** Product edit form
 - All product fields editable in single form
 - Fields include: title, category, author, description, long description, price, image URL, quantity
 - Real-time validation with error messages
 - Cancel button to discard changes
 - Save button to persist changes
 
-**FR-3.2:** Field validation rules
-- **ASIN:** Read-only (cannot be changed)
+**FR-3.3:** Field validation rules
+- **ASIN:** Required for creation, must be unique, 1-50 characters, read-only after creation
 - **Title:** Required, 1-500 characters
 - **Category:** Required, must exist in category list
+- **Author:** Required, 1-200 characters
 - **Price:** Required, positive decimal, max 2 decimal places, max value $99,999.99
-- **Quantity:** Required, non-negative integer, max 999,999
+- **Quantity:** Optional, defaults to 0, non-negative integer, max 999,999
 - **Image URL:** Optional, valid HTTP/HTTPS URL format
 - **Description:** Optional, max 1,000 characters
 - **Long Description:** Optional, max 5,000 characters
 
-**FR-3.3:** Concurrent edit detection
+**FR-3.4:** Concurrent edit detection
 - Warn user if product was modified by another user since load
 - Show option to view differences and choose version
 
-**FR-3.4:** Bulk update operations
+**FR-3.5:** Bulk update operations
 - Select multiple products via checkbox (select all option available)
 - Bulk actions: update category, apply price adjustment, activate/deactivate
 - Confirmation dialog showing affected product count
@@ -431,6 +460,7 @@ ALTER TABLE products ADD COLUMN deactivated_by VARCHAR(50);
 **Product Management:**
 - `GET /api/admin/products` - List products with filtering/pagination
 - `GET /api/admin/products/{asin}` - Get product details
+- `POST /api/admin/products` - Create new product
 - `PUT /api/admin/products/{asin}` - Update product
 - `DELETE /api/admin/products/{asin}` - Delete product
 - `PATCH /api/admin/products/{asin}/deactivate` - Soft delete
@@ -522,7 +552,6 @@ Admin Portal
 The following capabilities are explicitly out of scope for the initial release:
 
 **v1.0 Out of Scope:**
-- Adding new products (creation)
 - Image upload/hosting (only URL updates supported)
 - Product variants and SKU management
 - Inventory tracking and alerts
@@ -627,6 +656,7 @@ Within 30 days of launch:
 **Scope:**
 - Admin authentication (basic)
 - Product list view with search
+- Product creation (all fields)
 - Single product update (all fields)
 - Soft delete (deactivate/reactivate)
 - Basic audit logging
@@ -672,11 +702,10 @@ Within 30 days of launch:
 1. **Authentication:** Should we integrate with existing corporate SSO/LDAP, or implement standalone authentication?
 2. **User Management:** Who will create and manage admin user accounts?
 3. **Rollout Strategy:** Pilot with small group first, or full rollout?
-4. **Product Creation:** Should product creation be added to Phase 1 or Phase 2?
-5. **Image Management:** Do we need image upload capability, or is URL-only acceptable?
-6. **Notifications:** Do admin users need email notifications for certain events?
-7. **Mobile:** What percentage of admin users need mobile access?
-8. **Integration:** Should admin operations trigger events for other systems (analytics, ERP)?
+4. **Image Management:** Do we need image upload capability, or is URL-only acceptable?
+5. **Notifications:** Do admin users need email notifications for certain events?
+6. **Mobile:** What percentage of admin users need mobile access?
+7. **Integration:** Should admin operations trigger events for other systems (analytics, ERP)?
 
 ---
 
