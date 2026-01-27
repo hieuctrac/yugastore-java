@@ -390,7 +390,9 @@ Or change the port in the service's `application.yml`.
 
 Additional documentation is available in the `docs/` directory:
 
-- **[System Architecture](docs/architecture.md)** - Comprehensive architecture documentation including component details, data flows, and design decisions
+- **[System Architecture](docs/architecture.md)** - Comprehensive architecture documentation including component details, data flows, testing strategy, deployment procedures, and design decisions
+- **[Delivery Lead Guide](docs/delivery-guide.md)** - Quick reference for delivery planning, effort estimation, risk assessment, and incident response
+- **[Software Engineer Guide](docs/software-engineer-guide.md)** - Practical guide for developers including setup instructions, common development tasks, debugging tips, testing best practices, and code examples
 - **[Architecture Diagram](docs/architecture-diagram.txt)** - Visual ASCII diagrams showing system components and interactions
 - **[Business Purpose](docs/businesspurpose.md)** - Platform objectives and business outcomes
 - **[Project Charter](docs/projectcharter.md)** - Project governance and stakeholder roles

@@ -9,18 +9,26 @@
 ## Table of Contents
 
 1. [Executive Summary](#executive-summary)
-2. [System Overview](#system-overview)
-3. [Architecture Principles](#architecture-principles)
-4. [Component Architecture](#component-architecture)
-5. [Data Architecture](#data-architecture)
-6. [Communication Patterns](#communication-patterns)
-7. [Service Discovery & Registration](#service-discovery--registration)
-8. [Technology Stack](#technology-stack)
-9. [Deployment Architecture](#deployment-architecture)
-10. [Security Architecture](#security-architecture)
-11. [Scalability & Performance](#scalability--performance)
-12. [Integration Points](#integration-points)
-13. [Architecture Decisions](#architecture-decisions)
+2. [For Delivery Leads: Quick Reference](#for-delivery-leads-quick-reference)
+3. [System Overview](#system-overview)
+4. [Architecture Principles](#architecture-principles)
+5. [Component Architecture](#component-architecture)
+6. [Data Architecture](#data-architecture)
+7. [Communication Patterns](#communication-patterns)
+8. [Service Discovery & Registration](#service-discovery--registration)
+9. [Technology Stack](#technology-stack)
+10. [Deployment Architecture](#deployment-architecture)
+11. [Testing Strategy & Quality Assurance](#testing-strategy--quality-assurance)
+12. [Deployment Procedures & Rollback](#deployment-procedures--rollback)
+13. [Technical Complexity Assessment](#technical-complexity-assessment)
+14. [Team Skills & Capacity Requirements](#team-skills--capacity-requirements)
+15. [Operational Considerations](#operational-considerations)
+16. [Technical Debt & Maintenance](#technical-debt--maintenance)
+17. [Security Architecture](#security-architecture)
+18. [Scalability & Performance](#scalability--performance)
+19. [Integration Points](#integration-points)
+20. [Architecture Decisions](#architecture-decisions)
+21. [Risk Register & Mitigation](#risk-register--mitigation)
 
 ---
 
@@ -34,6 +42,115 @@ YugaStore is a microservices-based eCommerce platform built on Spring Boot and Y
 - **Resilient:** Service discovery, client-side load balancing, and fault tolerance
 - **Scalable:** Horizontal scaling support at both application and database tiers
 - **Cloud-Native:** Container-ready with Docker support
+
+---
+
+## For Delivery Leads: Quick Reference
+
+### Critical Dependencies
+
+**Infrastructure Requirements:**
+- YugabyteDB cluster (YSQL + YCQL) - Must be running before any service starts
+- Eureka Server (Port 8761) - Must start first, all services depend on it
+- Network connectivity between all services
+
+**Service Startup Order:**
+```
+1. YugabyteDB (database layer)
+2. Eureka Server (service discovery)
+3. Backend services in parallel:
+   - Products (8082)
+   - Cart (8083)
+   - Checkout (8086)
+4. API Gateway (8081) - Depends on backend services
+5. React UI (8080) - Depends on API Gateway
+```
+
+### Technical Complexity by Service
+
+| Service | Complexity | Key Challenges | Team Skill Required |
+|---------|------------|----------------|---------------------|
+| Products | Medium | YCQL/Cassandra data modeling, Spring Data Cassandra | Backend: Java, Cassandra/CQL |
+| Cart | Low-Medium | JPA/Hibernate with YSQL, transaction handling | Backend: Java, SQL, JPA |
+| Checkout | High | Multi-service orchestration, distributed transactions | Backend: Java, Feign, Cassandra, distributed systems |
+| API Gateway | Medium | Service aggregation, Feign clients, error handling | Backend: Java, Spring Cloud, REST APIs |
+| React UI | Medium | React components, BFF pattern, API integration | Frontend: React, JavaScript, REST |
+| Eureka Server | Low | Configuration only, Spring Cloud Netflix | Backend: Java, Spring Cloud |
+
+### Testing Complexity
+
+- **Unit Testing:** Straightforward with Spring Boot Test
+- **Integration Testing:** Requires running database and Eureka
+- **End-to-End Testing:** Requires all services running
+- **Test Data:** 6,000+ products must be loaded for realistic testing
+
+### Deployment Risk Assessment
+
+**Low Risk Changes:**
+- UI component updates (React frontend)
+- Product catalog data updates
+- Non-transactional service logic
+
+**Medium Risk Changes:**
+- API Gateway routing changes
+- Service endpoint modifications
+- Cart business logic
+
+**High Risk Changes:**
+- Database schema changes (especially YCQL)
+- Checkout orchestration flow
+- Eureka configuration changes
+- Transaction-enabled table modifications
+
+### Typical Delivery Timelines
+
+**New Feature (Simple):** 2-5 days
+- Example: Add new product attribute to display
+- Tasks: Schema update, service change, UI update, testing
+
+**New Feature (Medium):** 1-2 weeks
+- Example: Add product reviews capability
+- Tasks: New tables, service logic, API changes, UI components, integration testing
+
+**New Feature (Complex):** 2-4 weeks
+- Example: Implement user authentication (Login service)
+- Tasks: User schema, auth service, session management, security integration across services
+
+**Bug Fix:** 1-3 days
+- Depends on root cause location and testing requirements
+
+### Known Technical Debt
+
+1. **Fixed User ID:** All operations use "u1001" - blocks multi-user functionality
+2. **Login Service Incomplete:** Authentication not implemented
+3. **No Error Handling Strategy:** Services fail silently or propagate errors inconsistently
+4. **Missing Monitoring:** No centralized logging or APM
+5. **No Rate Limiting:** API Gateway has no protection against abuse
+6. **Hard-Coded Configuration:** Many values in application.yml should be externalized
+7. **Test Coverage Gaps:** Integration tests minimal, no load testing
+
+### Quick Troubleshooting Guide
+
+**Services Won't Start:**
+- Check Eureka is running at localhost:8761
+- Verify YugabyteDB is accessible (YSQL: 5433, YCQL: 9042)
+- Check port conflicts (8080-8086, 8761)
+
+**Services Not Registering with Eureka:**
+- Allow 30-60 seconds for registration
+- Check bootstrap.yml has correct Eureka URL
+- Verify network connectivity to Eureka
+
+**Cart Operations Failing:**
+- Check YSQL connection (postgresql://localhost:5433)
+- Verify shopping_cart table exists
+- Check user_id and data format
+
+**Checkout Failing:**
+- Verify Products service is accessible
+- Verify Cart service is accessible
+- Check inventory data exists in product_inventory table
+- Review transaction logs in YugabyteDB
 
 ---
 
@@ -1275,6 +1392,1216 @@ mvn spring-boot:run -Dserver.port=8102  # Instance 3
 - Single-user experience
 - Cart and orders not user-isolated
 - Must implement auth before real use
+
+---
+
+## Testing Strategy & Quality Assurance
+
+### Testing Pyramid
+
+```
+                    ┌─────────────┐
+                    │   E2E Tests │  ← Few (5-10)
+                    └─────────────┘
+                 ┌──────────────────┐
+                 │ Integration Tests│  ← Some (20-30)
+                 └──────────────────┘
+            ┌────────────────────────────┐
+            │      Unit Tests           │  ← Many (100+)
+            └────────────────────────────┘
+```
+
+### Unit Testing
+
+**Framework:** JUnit 5, Mockito, Spring Boot Test
+
+**Coverage Target:** 70%+ for business logic
+
+**What to Test:**
+- Service layer business logic
+- Controller request/response handling
+- Data transformation logic
+- Validation rules
+- Error handling
+
+**Example Test Structure:**
+```java
+@SpringBootTest
+class ProductServiceTest {
+    
+    @Mock
+    private ProductRepository productRepository;
+    
+    @InjectMocks
+    private ProductService productService;
+    
+    @Test
+    void testGetProductById() {
+        // Arrange
+        ProductMetadata product = new ProductMetadata();
+        product.setAsin("B00001");
+        when(productRepository.findById("B00001"))
+            .thenReturn(Optional.of(product));
+        
+        // Act
+        ProductMetadata result = productService.findById("B00001");
+        
+        // Assert
+        assertNotNull(result);
+        assertEquals("B00001", result.getAsin());
+    }
+}
+```
+
+**Current State:**
+- Minimal unit test coverage
+- No standardized test structure
+- Test data management needs improvement
+
+**Recommendation:**
+- Achieve 70% coverage before major features
+- Add test for each bug fix
+- Use test containers for repository tests
+
+---
+
+### Integration Testing
+
+**Framework:** Spring Boot Test, TestContainers, WireMock
+
+**What to Test:**
+- Database integration (YSQL and YCQL)
+- Service-to-service communication
+- Feign client interactions
+- Transaction boundaries
+- Error propagation
+
+**Test Environment Requirements:**
+- YugabyteDB (via TestContainers or local instance)
+- Eureka Server (embedded or standalone)
+- Test data loaded
+
+**Example Integration Test:**
+```java
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@Testcontainers
+class CartIntegrationTest {
+    
+    @Container
+    static PostgreSQLContainer<?> postgres = 
+        new PostgreSQLContainer<>("yugabytedb/yugabyte:latest");
+    
+    @Autowired
+    private ShoppingCartController cartController;
+    
+    @Test
+    void testAddProductToCart() {
+        // Test full flow from controller through to database
+        ResponseEntity<?> response = 
+            cartController.addProductToCart("B00001");
+        
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+}
+```
+
+**Current State:**
+- Limited integration test coverage
+- Manual testing required for service interactions
+- No automated E2E tests
+
+**Recommendation:**
+- Add integration tests for critical paths (checkout flow)
+- Use TestContainers for database isolation
+- Mock external service calls with WireMock
+
+---
+
+### End-to-End Testing
+
+**Framework:** Selenium, Cypress, or Playwright
+
+**What to Test:**
+- Complete user journeys
+- Browse products → Add to cart → Checkout
+- Error scenarios across services
+- Performance under load
+
+**Test Scenarios:**
+1. **Product Browsing:**
+   - Load homepage
+   - Navigate to category
+   - View product details
+   - Verify product information displays
+
+2. **Shopping Cart:**
+   - Add product to cart
+   - Verify cart updates
+   - Modify quantity
+   - Remove item
+
+3. **Checkout:**
+   - Complete checkout flow
+   - Verify order creation
+   - Verify inventory update
+   - Verify cart cleared
+
+**Current State:**
+- No automated E2E tests
+- Manual testing only
+
+**Recommendation:**
+- Start with smoke tests (happy path)
+- Add E2E for critical revenue flows
+- Run before each release
+
+---
+
+### Test Data Management
+
+**Product Catalog:**
+- 6,000+ products loaded from JSON
+- Use subset for testing (100-500 products)
+- Maintain test data scripts in `resources/`
+
+**Shopping Cart:**
+- Clear between tests
+- Use unique test user IDs
+- Reset to known state
+
+**Inventory:**
+- Set known quantities for test products
+- Verify updates in transaction tests
+- Reset after test runs
+
+**Database Reset Strategy:**
+```bash
+# Drop and recreate tables
+cqlsh -f resources/schema.cql
+ysqlsh -f resources/schema.sql
+
+# Load minimal test data
+python resources/load_test_data.py
+```
+
+---
+
+### Performance Testing
+
+**Tools:** JMeter, Gatling, or k6
+
+**Load Test Scenarios:**
+
+1. **Product Catalog Load:**
+   - Target: 1,000 req/sec
+   - Endpoint: GET /api/v1/products
+   - Expected: <100ms p95 latency
+
+2. **Add to Cart:**
+   - Target: 500 req/sec
+   - Endpoint: POST /api/v1/shoppingCart/addProduct
+   - Expected: <200ms p95 latency
+
+3. **Checkout:**
+   - Target: 100 req/sec
+   - Endpoint: POST /api/v1/shoppingCart/checkout
+   - Expected: <500ms p95 latency
+
+**Current State:**
+- No performance testing framework
+- Performance characteristics unknown
+- No baseline metrics
+
+**Recommendation:**
+- Establish baseline performance metrics
+- Run load tests before major releases
+- Monitor for performance regression
+
+---
+
+### Quality Gates
+
+**Definition of Done:**
+- [ ] Code reviewed by at least one team member
+- [ ] Unit tests written and passing (70%+ coverage for new code)
+- [ ] Integration tests for external dependencies
+- [ ] No critical or high severity bugs
+- [ ] API documentation updated
+- [ ] Deployment runbook updated
+- [ ] Manual testing completed
+- [ ] Performance impact assessed
+- [ ] Security review for sensitive changes
+
+**Release Criteria:**
+- [ ] All tests passing in CI/CD pipeline
+- [ ] No open P0/P1 bugs
+- [ ] Performance within acceptable thresholds
+- [ ] Database migrations tested
+- [ ] Rollback procedure documented and tested
+- [ ] Monitoring and alerts configured
+- [ ] Business stakeholder approval
+
+---
+
+## Deployment Procedures & Rollback
+
+### Pre-Deployment Checklist
+
+**Infrastructure:**
+- [ ] YugabyteDB cluster healthy (all nodes UP)
+- [ ] Sufficient disk space on all nodes
+- [ ] Backup completed within last 24 hours
+- [ ] Network connectivity verified
+- [ ] DNS/Load balancer configuration verified
+
+**Application:**
+- [ ] All services built successfully
+- [ ] Docker images pushed to registry (if using containers)
+- [ ] Configuration files reviewed and updated
+- [ ] Database migrations tested in staging
+- [ ] Feature flags configured (if applicable)
+
+**Team Readiness:**
+- [ ] Deployment runbook reviewed
+- [ ] Rollback procedure tested
+- [ ] On-call engineer identified
+- [ ] Communication plan ready (if customer-impacting)
+- [ ] Monitoring dashboards ready
+
+---
+
+### Deployment Procedure (Local/Development)
+
+**Step 1: Database Preparation**
+```bash
+# Backup current database
+yugabyted backup --backup_location=/backup/$(date +%Y%m%d)
+
+# Apply schema changes (if any)
+cqlsh -f migrations/001_add_column.cql
+ysqlsh -f migrations/001_add_column.sql
+
+# Verify schema changes
+cqlsh -e "DESCRIBE TABLE cronos.products"
+```
+
+**Step 2: Service Deployment**
+```bash
+# Stop services (reverse order)
+# Stop React UI
+pkill -f react-ui
+
+# Stop API Gateway
+pkill -f api-gateway
+
+# Stop backend services
+pkill -f products-microservice
+pkill -f cart-microservice
+pkill -f checkout-microservice
+
+# Build new versions
+mvn -DskipTests clean package
+
+# Start Eureka (if not running)
+cd eureka-server-local && mvn spring-boot:run &
+
+# Wait for Eureka to start
+sleep 30
+
+# Start backend services
+cd products-microservice && mvn spring-boot:run &
+cd cart-microservice && mvn spring-boot:run &
+cd checkout-microservice && mvn spring-boot:run &
+
+# Wait for service registration
+sleep 60
+
+# Start API Gateway
+cd api-gateway-microservice && mvn spring-boot:run &
+
+# Wait for API Gateway registration
+sleep 30
+
+# Start React UI
+cd react-ui && mvn spring-boot:run &
+```
+
+**Step 3: Verification**
+```bash
+# Check Eureka registration
+curl http://localhost:8761/eureka/apps
+
+# Health checks
+curl http://localhost:8082/actuator/health  # Products
+curl http://localhost:8083/actuator/health  # Cart
+curl http://localhost:8086/actuator/health  # Checkout
+curl http://localhost:8081/actuator/health  # API Gateway
+
+# Smoke tests
+curl http://localhost:8081/api/v1/products?limit=10
+curl -X POST http://localhost:8081/api/v1/shoppingCart
+```
+
+---
+
+### Deployment Procedure (Docker)
+
+**Step 1: Build Images**
+```bash
+# Build all services
+mvn -DskipTests clean package
+
+# Verify images created
+docker images | grep yugastore
+```
+
+**Step 2: Deploy Containers**
+```bash
+# Run deployment script
+./docker-run.sh
+
+# Verify containers running
+docker ps | grep yugastore
+
+# Check logs
+docker logs <container-id>
+```
+
+**Step 3: Verification**
+```bash
+# Check Eureka
+curl http://localhost:8761/eureka/apps
+
+# Access application
+curl http://localhost:8080
+```
+
+---
+
+### Rollback Procedures
+
+**Database Rollback:**
+```bash
+# Restore from backup
+yugabyted restore --backup_location=/backup/20260127
+
+# If migration needs reverting
+cqlsh -f migrations/001_rollback.cql
+ysqlsh -f migrations/001_rollback.sql
+```
+
+**Application Rollback (Local):**
+```bash
+# Checkout previous version
+git checkout <previous-tag>
+
+# Rebuild and deploy
+mvn -DskipTests clean package
+
+# Follow deployment procedure above
+```
+
+**Application Rollback (Docker):**
+```bash
+# Stop current containers
+docker stop $(docker ps -q --filter \"name=yugastore\")
+
+# Remove current containers
+docker rm $(docker ps -aq --filter \"name=yugastore\")
+
+# Pull previous images
+docker pull yugastore-products:<previous-tag>
+docker pull yugastore-cart:<previous-tag>
+# ... etc
+
+# Run with previous version
+./docker-run.sh
+```
+
+**Rollback Decision Criteria:**
+
+Rollback immediately if:
+- Critical functionality broken (checkout, cart operations)
+- Data corruption detected
+- Severe performance degradation (>5x latency increase)
+- Security vulnerability introduced
+- Cascading failures across services
+
+Consider rollback if:
+- Minor functionality broken (non-critical features)
+- Moderate performance impact (2-3x latency increase)
+- High error rates but system stable
+
+Monitor before deciding if:
+- Cosmetic issues only
+- Performance slightly degraded but acceptable
+- Issues affect <5% of users
+
+---
+
+### Monitoring During Deployment
+
+**Metrics to Watch:**
+
+1. **Service Health:**
+   - All services registered in Eureka
+   - Health check endpoints returning 200
+   - No repeated restarts
+
+2. **Error Rates:**
+   - HTTP 5xx responses
+   - Exception logs
+   - Failed database connections
+
+3. **Performance:**
+   - API response times
+   - Database query latency
+   - Service-to-service call latency
+
+4. **Business Metrics:**
+   - Successful checkouts
+   - Cart operations
+   - Product page views
+
+**Warning Signs:**
+- Error rate >1%
+- Response time >500ms p95
+- Any service not registering with Eureka
+- Database connection failures
+- Memory leaks (heap usage climbing)
+
+---
+
+## Technical Complexity Assessment
+
+### Service Complexity Matrix
+
+| Service | Lines of Code | Cyclomatic Complexity | External Dependencies | Change Frequency | Maintenance Difficulty |
+|---------|--------------|---------------------|---------------------|-----------------|----------------------|
+| Products | ~2,500 | Medium | YugabyteDB YCQL, Eureka | Low | Medium |
+| Cart | ~1,200 | Low | YugabyteDB YSQL, Eureka | Medium | Low |
+| Checkout | ~3,000 | High | YugabyteDB YCQL, Products, Cart, Eureka | Medium | High |
+| API Gateway | ~2,000 | Medium | All backend services, Eureka | Medium | Medium |
+| React UI | ~3,500 | Medium | API Gateway | High | Medium |
+| Eureka | ~500 | Low | None | Very Low | Low |
+
+---
+
+### Complexity by Technical Domain
+
+**Data Access Layer:**
+- **YCQL (Cassandra):** High complexity
+  - Non-relational data modeling
+  - CQL query syntax different from SQL
+  - Limited transaction support (even when enabled)
+  - No foreign keys or joins
+  - Steep learning curve
+
+- **YSQL (PostgreSQL):** Medium complexity
+  - Familiar SQL syntax
+  - JPA/Hibernate abstraction
+  - Standard relational patterns
+  - Well-documented
+
+**Service Communication:**
+- **Feign Clients:** Medium complexity
+  - Declarative REST clients
+  - Eureka integration
+  - Error handling
+  - Retry logic
+  - Timeout configuration
+
+**Service Orchestration:**
+- **Checkout Service:** High complexity
+  - Multi-step workflow
+  - Distributed transaction coordination
+  - Error handling across services
+  - Compensation logic for failures
+  - Requires deep understanding of all services
+
+**Frontend:**
+- **React Components:** Medium complexity
+  - Component lifecycle
+  - State management
+  - API integration
+  - Error handling
+  - Responsive design
+
+---
+
+### Technology Learning Curve
+
+**For New Team Members:**
+
+**Week 1-2: Foundation**
+- Spring Boot basics
+- Maven build process
+- Git workflow
+- Local development setup
+- YugabyteDB installation and basics
+
+**Week 3-4: Core Technologies**
+- Spring Cloud concepts (Eureka, Feign)
+- YSQL vs YCQL differences
+- Microservices communication patterns
+- Docker containerization
+- Testing frameworks
+
+**Week 5-6: System Understanding**
+- Service dependencies
+- Data flow through system
+- Debugging distributed systems
+- Deployment procedures
+- Monitoring and troubleshooting
+
+**Week 7-8: Productive Development**
+- First feature implementation
+- Code review process
+- Release procedures
+- On-call responsibilities
+
+**Estimated Ramp-Up Time:**
+- Junior Developer: 8-12 weeks to full productivity
+- Mid-Level Developer: 4-6 weeks to full productivity
+- Senior Developer: 2-3 weeks to full productivity
+
+---
+
+### Common Development Challenges
+
+1. **Service Discovery Issues**
+   - **Problem:** Services not finding each other
+   - **Root Cause:** Eureka not running, network issues, wrong service names
+   - **Resolution Time:** 15-30 minutes
+   - **Prevention:** Startup scripts, health checks
+
+2. **Database Connection Problems**
+   - **Problem:** Can't connect to YSQL or YCQL
+   - **Root Cause:** YugabyteDB not running, wrong port, credentials
+   - **Resolution Time:** 10-20 minutes
+   - **Prevention:** Docker compose setup, connection retry logic
+
+3. **Feign Client Timeouts**
+   - **Problem:** Service calls timing out
+   - **Root Cause:** Slow service, network issues, missing endpoints
+   - **Resolution Time:** 30-60 minutes
+   - **Prevention:** Configure appropriate timeouts, circuit breakers
+
+4. **YCQL Query Performance**
+   - **Problem:** Slow queries, timeouts
+   - **Root Cause:** Missing indexes, inefficient queries, large result sets
+   - **Resolution Time:** 2-4 hours (analysis + fix)
+   - **Prevention:** Query planning, index design, pagination
+
+5. **Transaction Failures**
+   - **Problem:** Orders not created, inventory not updated
+   - **Root Cause:** Transaction conflicts, isolation issues
+   - **Resolution Time:** 1-4 hours
+   - **Prevention:** Transaction design, retry logic, monitoring
+
+---
+
+## Team Skills & Capacity Requirements
+
+### Core Skills Required
+
+**Backend Development (4-5 engineers):**
+
+**Must Have:**
+- Java 11+ proficiency
+- Spring Boot framework
+- RESTful API design
+- Git version control
+- Unit testing (JUnit, Mockito)
+- SQL fundamentals
+
+**Should Have:**
+- Spring Cloud (Eureka, Feign, Config)
+- Microservices architecture patterns
+- Docker containerization
+- NoSQL databases (Cassandra/CQL knowledge helpful)
+- Integration testing
+- CI/CD pipelines
+
+**Nice to Have:**
+- Distributed systems experience
+- YugabyteDB specific knowledge
+- Kubernetes
+- Performance tuning
+- Security best practices
+
+**Frontend Development (2-3 engineers):**
+
+**Must Have:**
+- JavaScript ES6+
+- React framework
+- HTML5/CSS3
+- RESTful API consumption
+- Git version control
+- Browser debugging tools
+
+**Should Have:**
+- React Router
+- State management (Redux/Context API)
+- Responsive design
+- npm/yarn package management
+- Webpack/build tools
+- Unit testing (Jest, React Testing Library)
+
+**Nice to Have:**
+- TypeScript
+- UI/UX design principles
+- Accessibility standards
+- Performance optimization
+
+**DevOps/Infrastructure (1-2 engineers):**
+
+**Must Have:**
+- Linux system administration
+- Docker containerization
+- Shell scripting
+- Network fundamentals
+- Git version control
+
+**Should Have:**
+- YugabyteDB administration
+- Database backup/restore
+- Monitoring tools
+- Log aggregation
+- CI/CD pipelines (Jenkins, GitLab CI, GitHub Actions)
+
+**Nice to Have:**
+- Kubernetes orchestration
+- Terraform/Infrastructure as Code
+- Cloud platforms (AWS, GCP, Azure)
+- Service mesh (Istio, Linkerd)
+
+---
+
+### Team Capacity Planning
+
+**For New Feature Development:**
+
+**Small Feature (2-5 days):**
+- 1 Backend Engineer
+- 1 Frontend Engineer (if UI changes)
+- Part-time: QA, DevOps
+
+**Medium Feature (1-2 weeks):**
+- 2 Backend Engineers
+- 1 Frontend Engineer
+- Part-time: QA, DevOps, Product Owner
+
+**Large Feature (2-4 weeks):**
+- 3-4 Backend Engineers
+- 2 Frontend Engineers
+- Full-time: 1 QA Engineer
+- Part-time: DevOps, Product Owner, Architect
+
+**For Maintenance & Bug Fixes:**
+- Allocate 20-30% of sprint capacity
+- 1-2 engineers on rotation for production support
+
+**For Technical Debt:**
+- Allocate 15-20% of sprint capacity
+- Dedicated time each sprint
+- Track as backlog items
+
+---
+
+### Skill Gaps & Training Needs
+
+**Current Gaps:**
+
+1. **YugabyteDB Expertise:**
+   - Need: Deep understanding of YCQL and YSQL
+   - Training: Official YugabyteDB certification, hands-on workshops
+   - Timeline: 2-3 months to proficiency
+
+2. **Distributed Systems:**
+   - Need: Transaction handling, consistency patterns
+   - Training: Books, online courses, mentorship
+   - Timeline: 3-6 months to proficiency
+
+3. **Production Operations:**
+   - Need: Monitoring, incident response, troubleshooting
+   - Training: On-call shadowing, runbook creation
+   - Timeline: 2-3 months to confidence
+
+4. **Security Best Practices:**
+   - Need: Authentication, authorization, secure coding
+   - Training: Security workshops, code review focus
+   - Timeline: 1-2 months for basics
+
+**Recommended Training Path:**
+
+**Month 1:**
+- Spring Boot advanced topics
+- YugabyteDB fundamentals
+- Microservices patterns
+
+**Month 2:**
+- YugabyteDB administration
+- Distributed transactions
+- Service discovery patterns
+
+**Month 3:**
+- Production operations
+- Monitoring and alerting
+- Incident response
+
+---
+
+## Operational Considerations
+
+### System Health Monitoring
+
+**Service-Level Metrics:**
+
+1. **Availability:**
+   - Target: 99.9% uptime (43 minutes downtime/month)
+   - Measurement: Health check endpoint success rate
+   - Alert: Any service down >5 minutes
+
+2. **Response Time:**
+   - Target: p95 < 200ms (API Gateway)
+   - Measurement: HTTP request duration
+   - Alert: p95 > 500ms for >5 minutes
+
+3. **Error Rate:**
+   - Target: <0.1% HTTP 5xx responses
+   - Measurement: Error count / total requests
+   - Alert: Error rate >1% for >2 minutes
+
+4. **Throughput:**
+   - Baseline: ~100 req/sec current capacity
+   - Measurement: Requests per second
+   - Alert: Sudden drop >50%
+
+**Database Metrics:**
+
+1. **Connection Pool:**
+   - Target: <80% utilization
+   - Alert: >90% utilization for >5 minutes
+
+2. **Query Latency:**
+   - Target: p95 < 50ms
+   - Alert: p95 > 200ms for >5 minutes
+
+3. **Disk Space:**
+   - Target: <70% utilization
+   - Alert: >85% utilization
+
+4. **Replication Lag:**
+   - Target: <1 second
+   - Alert: >10 seconds
+
+**Business Metrics:**
+
+1. **Checkout Success Rate:**
+   - Target: >95%
+   - Alert: <90% for >10 minutes
+
+2. **Cart Operations:**
+   - Target: >99% success
+   - Alert: <95% success
+
+3. **Product Page Load:**
+   - Target: 100% success
+   - Alert: <98% success
+
+---
+
+### Logging Strategy
+
+**Log Levels:**
+- **ERROR:** Service errors, exceptions, failures (page on-call)
+- **WARN:** Degraded performance, retries, recoverable errors
+- **INFO:** Business events, service lifecycle, key operations
+- **DEBUG:** Detailed flow, variable values (development only)
+
+**Log Structure (JSON):**
+```json
+{
+  \"timestamp\": \"2026-01-27T10:30:00Z\",
+  \"level\": \"ERROR\",
+  \"service\": \"checkout-microservice\",
+  \"traceId\": \"abc123\",
+  \"userId\": \"u1001\",
+  \"message\": \"Inventory check failed\",
+  \"exception\": \"InsufficientStockException\",
+  \"asin\": \"B00001\"
+}
+```
+
+**What to Log:**
+- Service startup/shutdown
+- All API requests (with response time)
+- Database queries (slow queries >100ms)
+- Service-to-service calls
+- Authentication attempts
+- Business transactions (cart add, checkout)
+- Errors and exceptions with stack traces
+- Configuration changes
+
+**What NOT to Log:**
+- Passwords or credentials
+- Full credit card numbers
+- Personal identifiable information (PII)
+- Large request/response payloads
+
+---
+
+### Backup and Recovery
+
+**Database Backup Strategy:**
+
+**Full Backup:**
+- Frequency: Daily at 2 AM
+- Retention: 30 days
+- Location: Local disk + offsite storage
+- Command: `yugabyted backup --backup_location=/backup/$(date +%Y%m%d)`
+
+**Incremental Backup:**
+- Frequency: Every 4 hours
+- Retention: 7 days
+- Not currently implemented (YugabyteDB feature limitation)
+
+**Recovery Time Objective (RTO):**
+- Target: 4 hours
+- Full database restore from backup
+
+**Recovery Point Objective (RPO):**
+- Target: 24 hours (daily backup)
+- Acceptable data loss: 1 day of transactions
+
+**Disaster Recovery Procedure:**
+1. Identify failure scope (database vs. application)
+2. Restore YugabyteDB from latest backup
+3. Rebuild and deploy application services
+4. Verify data integrity
+5. Resume normal operations
+6. Analyze root cause
+
+---
+
+### Capacity Planning
+
+**Current Capacity:**
+- Products: 6,000 items
+- Concurrent Users: ~50 (estimated based on dev setup)
+- Transactions/Day: <1,000
+- Storage: ~5 GB
+
+**Growth Projections:**
+
+**Year 1:**
+- Products: 10,000 items
+- Concurrent Users: 500
+- Transactions/Day: 10,000
+- Storage: 20 GB
+
+**Scaling Actions Needed:**
+- Add YugabyteDB nodes (3 → 5)
+- Scale services horizontally (2-3 instances each)
+- Add load balancer
+- Implement caching layer
+
+**Year 2:**
+- Products: 50,000 items
+- Concurrent Users: 2,000
+- Transactions/Day: 50,000
+- Storage: 100 GB
+
+**Scaling Actions Needed:**
+- YugabyteDB cluster expansion (5 → 9 nodes)
+- Service scaling (3-5 instances each)
+- CDN for static assets
+- Database read replicas
+- Multi-region deployment
+
+---
+
+### On-Call and Incident Response
+
+**On-Call Rotation:**
+- 1 week rotations
+- Primary + Secondary engineer
+- 24/7 coverage recommended for production
+
+**Incident Severity Levels:**
+
+**P0 (Critical):**
+- System down, checkout broken
+- Response: Immediate (<5 minutes)
+- Escalation: Management notified immediately
+- Examples: Database crash, all services down
+
+**P1 (High):**
+- Major feature broken, significant degradation
+- Response: <30 minutes
+- Escalation: Manager notified within 1 hour
+- Examples: Cart not working, slow response times
+
+**P2 (Medium):**
+- Minor feature broken, limited impact
+- Response: <2 hours
+- Escalation: Manager notified next business day
+- Examples: UI glitch, non-critical API error
+
+**P3 (Low):**
+- Cosmetic issues, no functional impact
+- Response: Next business day
+- Escalation: None required
+- Examples: Typo, minor UI misalignment
+
+**Incident Response Playbook:**
+
+1. **Acknowledge:** Respond to alert within SLA
+2. **Assess:** Determine severity and impact
+3. **Communicate:** Update status page, notify stakeholders
+4. **Mitigate:** Apply immediate fix or rollback
+5. **Resolve:** Implement permanent solution
+6. **Document:** Write post-mortem
+7. **Learn:** Update runbooks, add monitoring
+
+---
+
+## Technical Debt & Maintenance
+
+### Current Technical Debt Inventory
+
+**Priority 1 (High Impact, Should Fix Soon):**
+
+1. **Fixed User ID (\"u1001\")**
+   - Impact: Blocks multi-user functionality
+   - Effort: 2-3 weeks (complete Login service)
+   - Dependencies: User database schema, session management
+   - Business Impact: Cannot support real customers
+
+2. **No Centralized Error Handling**
+   - Impact: Inconsistent error responses, poor debugging
+   - Effort: 1 week
+   - Dependencies: None
+   - Business Impact: Longer incident resolution time
+
+3. **Missing Monitoring and Observability**
+   - Impact: Cannot detect issues proactively
+   - Effort: 2 weeks (Prometheus + Grafana setup)
+   - Dependencies: Infrastructure setup
+   - Business Impact: Higher MTTR (Mean Time To Repair)
+
+**Priority 2 (Medium Impact, Plan for Next Quarter):**
+
+4. **Hard-Coded Configuration**
+   - Impact: Difficult to deploy across environments
+   - Effort: 1 week (Spring Cloud Config)
+   - Dependencies: Config server setup
+   - Business Impact: Slower deployments, config errors
+
+5. **No Rate Limiting or Circuit Breakers**
+   - Impact: Vulnerable to cascading failures
+   - Effort: 1-2 weeks (Resilience4j)
+   - Dependencies: None
+   - Business Impact: Service instability under load
+
+6. **Limited Test Coverage**
+   - Impact: Regression risks, slow development
+   - Effort: Ongoing (3-4 sprints to reach 70%)
+   - Dependencies: Testing framework setup
+   - Business Impact: More production bugs
+
+**Priority 3 (Low Impact, Nice to Have):**
+
+7. **React UI Using Older React Version**
+   - Impact: Missing modern React features
+   - Effort: 1-2 weeks
+   - Dependencies: Component rewrite
+   - Business Impact: Slower frontend development
+
+8. **No API Documentation (Swagger/OpenAPI)**
+   - Impact: Harder for frontend developers
+   - Effort: 3-5 days
+   - Dependencies: None
+   - Business Impact: Slower integration work
+
+9. **Inconsistent Code Style**
+   - Impact: Code review friction
+   - Effort: 2-3 days (CheckStyle setup)
+   - Dependencies: None
+   - Business Impact: Slower code reviews
+
+---
+
+### Maintenance Windows
+
+**Regular Maintenance:**
+- **Frequency:** Bi-weekly (every other Sunday 2-6 AM)
+- **Activities:**
+  - Database optimization
+  - Log rotation
+  - Disk space cleanup
+  - Security patches
+  - Dependency updates
+
+**Emergency Maintenance:**
+- **Trigger:** Critical security vulnerability, data corruption
+- **Process:**
+  1. Assess severity and impact
+  2. Notify stakeholders (15 minutes notice if possible)
+  3. Take backup
+  4. Apply fix
+  5. Verify system health
+  6. Post-incident review
+
+**Planned Downtime:**
+- **Target:** <4 hours/year
+- **Schedule:** Coordinated with business (avoid peak shopping periods)
+- **Communication:** 2 weeks notice, status page updates
+
+---
+
+### Dependency Management
+
+**Java Dependencies:**
+- **Review Frequency:** Monthly
+- **Update Strategy:** Minor versions quarterly, major versions semi-annually
+- **Security Updates:** Within 1 week of CVE disclosure
+
+**Critical Dependencies:**
+- Spring Boot 2.6.3 → Monitor for 2.7.x updates
+- YugabyteDB Driver 4.6.0-yb-10 → Follow YugabyteDB releases
+- React 16.2 → Plan upgrade to React 18
+
+**Dependency Risks:**
+- Spring Boot 2.x will reach end-of-life
+- Older React version missing features
+- Some dependencies have known CVEs (low severity)
+
+**Recommended Actions:**
+- Quarterly dependency review
+- Automated security scanning (Dependabot, Snyk)
+- Test suite to validate updates
+
+---
+
+## Risk Register & Mitigation
+
+### Technical Risks
+
+**Risk 1: YugabyteDB Single Point of Failure**
+- **Likelihood:** Medium
+- **Impact:** Critical (complete system outage)
+- **Mitigation:**
+  - Deploy YugabyteDB in HA configuration (3+ nodes, RF=3)
+  - Regular backup testing
+  - Documented recovery procedures
+  - Monitoring and alerting
+- **Owner:** DevOps Lead
+- **Status:** Partially mitigated (backups exist, multi-node not deployed)
+
+**Risk 2: Eureka Server Failure**
+- **Likelihood:** Low
+- **Impact:** High (services cannot discover each other)
+- **Mitigation:**
+  - Deploy multiple Eureka instances
+  - Services cache registry locally
+  - Fallback to direct service URLs
+  - Quick restart procedure (<5 minutes)
+- **Owner:** Delivery Lead
+- **Status:** Low mitigation (single Eureka instance)
+
+**Risk 3: Cascade Failure (Checkout → Cart → Products)**
+- **Likelihood:** Medium
+- **Impact:** High (checkout broken, revenue impact)
+- **Mitigation:**
+  - Implement circuit breakers (Resilience4j)
+  - Set appropriate timeouts
+  - Graceful degradation patterns
+  - Rate limiting per service
+- **Owner:** Delivery Lead
+- **Status:** Not mitigated (no circuit breakers)
+
+**Risk 4: YCQL Transaction Conflicts**
+- **Likelihood:** Medium
+- **Impact:** Medium (checkout failures, inventory errors)
+- **Mitigation:**
+  - Implement retry logic with exponential backoff
+  - Optimize transaction isolation levels
+  - Reduce transaction scope
+  - Monitor transaction conflicts
+- **Owner:** Backend Tech Lead
+- **Status:** Partially mitigated (basic retry exists)
+
+**Risk 5: Insufficient Monitoring**
+- **Likelihood:** High
+- **Impact:** High (cannot detect or diagnose issues)
+- **Mitigation:**
+  - Deploy Prometheus + Grafana
+  - Add custom business metrics
+  - Set up alerting rules
+  - Create operational dashboards
+- **Owner:** DevOps Lead
+- **Status:** High risk (minimal monitoring)
+
+### Delivery Risks
+
+**Risk 6: Knowledge Silos**
+- **Likelihood:** Medium
+- **Impact:** Medium (slows delivery, blocks releases)
+- **Mitigation:**
+  - Documentation (architecture, runbooks)
+  - Pair programming
+  - Code reviews mandatory
+  - Knowledge sharing sessions
+  - Cross-training on all services
+- **Owner:** Delivery Lead
+- **Status:** Partially mitigated (docs improving)
+
+**Risk 7: Complex Deployments**
+- **Likelihood:** Medium
+- **Impact:** Medium (deployment failures, rollback needs)
+- **Mitigation:**
+  - Automated deployment scripts
+  - Blue-green deployment strategy
+  - Thorough pre-deploy checklist
+  - Deployment rehearsals in staging
+- **Owner:** DevOps Lead
+- **Status:** Partially mitigated (scripts exist, not automated)
+
+**Risk 8: Inadequate Testing**
+- **Likelihood:** High
+- **Impact:** High (production bugs, customer impact)
+- **Mitigation:**
+  - Improve test coverage to 70%+
+  - Add integration and E2E tests
+  - Performance testing before releases
+  - Staging environment for validation
+- **Owner:** Delivery Lead
+- **Status:** High risk (low test coverage)
+
+### Business Risks
+
+**Risk 9: Fixed User ID Limitation**
+- **Likelihood:** High (if trying to launch to customers)
+- **Impact:** Critical (cannot support multiple users)
+- **Mitigation:**
+  - Prioritize Login service completion
+  - Implement proper authentication
+  - Add user session management
+- **Owner:** Product Owner
+- **Status:** Accepted for demo, must fix for production
+
+**Risk 10: No Security Implementation**
+- **Likelihood:** High (if exposed to internet)
+- **Impact:** Critical (security breach, data loss)
+- **Mitigation:**
+  - Implement authentication and authorization
+  - Add API rate limiting
+  - Security audit before production
+  - TLS/SSL for all communications
+- **Owner:** Security Representative
+- **Status:** High risk (demo only, not production-ready)
 
 ---
 
