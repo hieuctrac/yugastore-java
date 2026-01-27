@@ -10,7 +10,7 @@ server:
 logging:
   level:
     root: info
-    org.springframework.wen: info
+    org.springframework.web: info
     org.hibernate.SQL: debug
     org.hibernate.type: trace
     org.hibernate.type.descriptor.BasicBinder: trace

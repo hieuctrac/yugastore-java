@@ -1,0 +1,295 @@
+╔════════════════════════════════════════════════════════════════════════════════════════╗
+║                        YugaStore - System Architecture Diagram                          ║
+╚════════════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                     Browser Client                                       │
+│                              (Customer-Facing Interface)                                 │
+└──────────────────────────────────────┬───────────────────────────────────────────────────┘
+                                       │
+                                       │ HTTP/HTTPS (Port 80/443)
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────────────┐
+│                              React UI Service (Port 8080)                                 │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  Frontend Layer                                                                   │  │
+│  │  • React Components (Product Catalog, Cart, Checkout)                           │  │
+│  │  • Client-Side Routing (React Router)                                           │  │
+│  │  • State Management                                                              │  │
+│  └──────────────────────────────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  Backend for Frontend (BFF) Layer                                                │  │
+│  │  • Spring Boot Server                                                            │  │
+│  │  • API Aggregation                                                               │  │
+│  │  • Response Transformation                                                       │  │
+│  └──────────────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────┬───────────────────────────────────────────────────┘
+                                       │
+                                       │ REST API (http://localhost:8081/api/v1)
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────────────────┐
+│                          API Gateway Service (Port 8081)                                  │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  Gateway Functions                                                                │  │
+│  │  • Request Routing                                                                │  │
+│  │  • Service Aggregation & Orchestration                                           │  │
+│  │  • Protocol Translation                                                           │  │
+│  │  • Cross-Cutting Concerns (Future: Auth, Rate Limiting)                         │  │
+│  └──────────────────────────────────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
+│  │  Feign Clients (Declarative REST)                                                │  │
+│  │  • ProductCatalogRestClient                                                       │  │
+│  │  • ShoppingCartRestClient                                                         │  │
+│  │  • CheckoutRestClient                                                             │  │
+│  └──────────────────────────────────────────────────────────────────────────────────┘  │
+└────────────┬─────────────────────────────┬────────────────────────────┬──────────────────┘
+             │                             │                            │
+             │                             │                            │
+     ┌───────▼──────────┐         ┌────────▼─────────┐       ┌─────────▼────────┐
+     │                  │         │                  │       │                  │
+     │   Products       │         │     Cart         │       │   Checkout       │
+     │  Microservice    │         │  Microservice    │       │  Microservice    │
+     │                  │         │                  │       │                  │
+     │  Port: 8082      │         │  Port: 8083      │       │  Port: 8086      │
+     │                  │         │                  │       │                  │
+     └────────┬─────────┘         └────────┬─────────┘       └─────────┬────────┘
+              │                            │                           │
+              │ YCQL API                   │ YSQL API                  │ YCQL API
+              │ (Port 9042)                │ (Port 5433)               │ (Port 9042)
+              │                            │                           │
+              │  ┌─────────────────────────┼───────────────────────────┼──────────┐
+              │  │                         │                           │          │
+              │  │  ┌──────────────────────▼─────────┐  ┌──────────────▼──────┐  │
+              │  │  │   YCQL API (Cassandra)         │  │   YSQL API (PG)     │  │
+              │  │  │   • Product Catalog            │  │   • Shopping Cart   │  │
+              │  │  │   • Product Rankings           │  │   • User Data       │  │
+              └──┼──►   • Orders                     │  │                     │  │
+                 │  │   • Inventory                  │  │                     │  │
+                 │  └────────────────────────────────┘  └─────────────────────┘  │
+                 │                                                                │
+                 │                  YugabyteDB Distributed Cluster                │
+                 │                     (Polyglot Persistence)                     │
+                 │                                                                │
+                 │  ┌─────────────────────────────────────────────────────────┐  │
+                 │  │              DocDB - Distributed Storage Layer          │  │
+                 │  │  • Automatic Sharding                                   │  │
+                 │  │  • Replication (RF=3)                                   │  │
+                 │  │  • Multi-Region Support                                 │  │
+                 │  │  • ACID Transactions                                    │  │
+                 │  └─────────────────────────────────────────────────────────┘  │
+                 │                                                                │
+                 └────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                      Service Discovery & Registration (Eureka)                           │
+│                                                                                           │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │                        Eureka Server (Port 8761)                                   │  │
+│  │                                                                                    │  │
+│  │  Service Registry:                                                                 │  │
+│  │  ┌────────────────┬─────────────────┬──────────────────┬──────────────────────┐  │  │
+│  │  │ Service Name   │ Instance(s)     │ Health Status    │ Metadata             │  │  │
+│  │  ├────────────────┼─────────────────┼──────────────────┼──────────────────────┤  │  │
+│  │  │ api-gateway    │ localhost:8081  │ UP               │ port, zone, etc.     │  │  │
+│  │  │ products       │ localhost:8082  │ UP               │ port, zone, etc.     │  │  │
+│  │  │ cart           │ localhost:8083  │ UP               │ port, zone, etc.     │  │  │
+│  │  │ checkout       │ localhost:8086  │ UP               │ port, zone, etc.     │  │  │
+│  │  └────────────────┴─────────────────┴──────────────────┴──────────────────────┘  │  │
+│  │                                                                                    │  │
+│  │  Features:                                                                         │  │
+│  │  • Service Registration                                                            │  │
+│  │  • Health Monitoring (Heartbeats every 30s)                                       │  │
+│  │  • Service Discovery                                                               │  │
+│  │  • Client-Side Load Balancing (via Ribbon)                                        │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                           │
+│                          ▲                  ▲                  ▲                          │
+│                          │                  │                  │                          │
+│                   Register/Heartbeat   Register/Heartbeat   Register/Heartbeat           │
+│                          │                  │                  │                          │
+│                    ┌─────┴─────┐      ┌────┴────┐       ┌─────┴─────┐                   │
+│                    │ Products  │      │  Cart   │       │ Checkout  │                   │
+│                    │ Service   │      │ Service │       │  Service  │                   │
+│                    └───────────┘      └─────────┘       └───────────┘                   │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                              Communication Patterns
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  1. Client-to-Gateway Communication (Synchronous HTTP)                                   │
+│                                                                                           │
+│     Browser ──[HTTP GET/POST]──► API Gateway                                            │
+│                                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  2. Service-to-Service Communication (Feign + Eureka)                                    │
+│                                                                                           │
+│     API Gateway                                                                           │
+│         │                                                                                 │
+│         ├─[1. Query Eureka for "products-microservice"]──► Eureka Server                │
+│         │                                                          │                      │
+│         ◄─[2. Return: localhost:8082]────────────────────────────┘                      │
+│         │                                                                                 │
+│         ├─[3. HTTP Request via Feign]──────────────────► Products Service               │
+│         │                                                                                 │
+│         ◄─[4. JSON Response]────────────────────────────                                │
+│                                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│  3. Checkout Orchestration (Multi-Service Coordination)                                  │
+│                                                                                           │
+│     Checkout Service                                                                      │
+│         │                                                                                 │
+│         ├─[1. Get Cart Items]──────────────────► Cart Service                           │
+│         ◄─[Cart Data: {asin: qty}]───────────────                                       │
+│         │                                                                                 │
+│         ├─[2. Validate Products]───────────────► Products Service                       │
+│         ◄─[Product Metadata]──────────────────────                                       │
+│         │                                                                                 │
+│         ├─[3. Check Inventory]─────► YugabyteDB (product_inventory)                     │
+│         │                                                                                 │
+│         ├─[4. Create Order + Update Inventory]─► YugabyteDB (Transaction)               │
+│         │                                                                                 │
+│         ├─[5. Clear Cart]──────────────────────► Cart Service                           │
+│         │                                                                                 │
+│         └─[6. Return Order Confirmation]                                                 │
+│                                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                                  Data Flow Example
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+Add Product to Cart Flow:
+
+┌───────────┐      ┌──────────┐      ┌────────────┐      ┌──────────┐      ┌────────────┐
+│  Browser  │      │ React UI │      │ API Gateway│      │   Cart   │      │ YugabyteDB │
+│           │      │  (BFF)   │      │            │      │  Service │      │   (YSQL)   │
+└─────┬─────┘      └────┬─────┘      └─────┬──────┘      └────┬─────┘      └─────┬──────┘
+      │                 │                   │                   │                  │
+      │ Click "Add"     │                   │                   │                  │
+      ├────────────────►│                   │                   │                  │
+      │                 │                   │                   │                  │
+      │                 │ POST /cart/add    │                   │                  │
+      │                 ├──────────────────►│                   │                  │
+      │                 │  {asin: "B00.."}  │                   │                  │
+      │                 │                   │                   │                  │
+      │                 │                   │ POST /cart-microservice/              │
+      │                 │                   │      addProduct   │                  │
+      │                 │                   ├──────────────────►│                  │
+      │                 │                   │ userid=u1001      │                  │
+      │                 │                   │ asin=B00...       │                  │
+      │                 │                   │                   │                  │
+      │                 │                   │                   │ INSERT/UPDATE    │
+      │                 │                   │                   │ shopping_cart    │
+      │                 │                   │                   ├─────────────────►│
+      │                 │                   │                   │                  │
+      │                 │                   │                   │ Success          │
+      │                 │                   │                   │◄─────────────────┤
+      │                 │                   │                   │                  │
+      │                 │                   │ "Added to Cart"   │                  │
+      │                 │                   │◄──────────────────┤                  │
+      │                 │                   │                   │                  │
+      │                 │ Cart updated      │                   │                  │
+      │                 │◄──────────────────┤                   │                  │
+      │                 │                   │                   │                  │
+      │ UI refreshes    │                   │                   │                  │
+      │◄────────────────┤                   │                   │                  │
+      │                 │                   │                   │                  │
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                                Container Deployment View
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                  Docker Host                                             │
+│                                                                                           │
+│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐                │
+│  │ Container          │  │ Container          │  │ Container          │                │
+│  │                    │  │                    │  │                    │                │
+│  │ yugastore-eureka   │  │ yugastore-api      │  │ yugastore-react    │                │
+│  │                    │  │                    │  │                    │                │
+│  │ Image: eclipse-    │  │ Image: eclipse-    │  │ Image: eclipse-    │                │
+│  │   temurin:17-jre   │  │   temurin:17-jre   │  │   temurin:17-jre   │                │
+│  │                    │  │                    │  │                    │                │
+│  │ Port: 8761         │  │ Port: 8081         │  │ Port: 8080         │                │
+│  └────────────────────┘  └────────────────────┘  └────────────────────┘                │
+│                                                                                           │
+│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐                │
+│  │ Container          │  │ Container          │  │ Container          │                │
+│  │                    │  │                    │  │                    │                │
+│  │ yugastore-products │  │ yugastore-cart     │  │ yugastore-checkout │                │
+│  │                    │  │                    │  │                    │                │
+│  │ Image: eclipse-    │  │ Image: eclipse-    │  │ Image: eclipse-    │                │
+│  │   temurin:17-jre   │  │   temurin:17-jre   │  │   temurin:17-jre   │                │
+│  │                    │  │                    │  │                    │                │
+│  │ Port: 8082         │  │ Port: 8083         │  │ Port: 8086         │                │
+│  └────────────────────┘  └────────────────────┘  └────────────────────┘                │
+│                                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────────────────┐    │
+│  │                        YugabyteDB Container/Host                                 │    │
+│  │                                                                                  │    │
+│  │  YSQL Port: 5433                              YCQL Port: 9042                   │    │
+│  │  Web UI: 15433                                                                   │    │
+│  └─────────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                              Technology Stack Summary
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+Backend Services:
+├─ Java 17
+├─ Spring Boot 2.6.3
+├─ Spring Cloud 2021.0.0
+├─ Spring Cloud Netflix Eureka
+├─ Spring Cloud OpenFeign
+├─ Spring Data JPA (YSQL services)
+├─ Spring Data Cassandra (YCQL services)
+└─ YugabyteDB Java Driver 4.6.0-yb-10
+
+Frontend:
+├─ React 16.2
+├─ React Router DOM 4.2.2
+├─ Bootstrap 3.3.7
+├─ Axios 0.18.0
+└─ React Bootstrap 0.32.4
+
+Database:
+├─ YugabyteDB
+│  ├─ YSQL API (PostgreSQL 11+ compatible)
+│  └─ YCQL API (Cassandra 3.x compatible)
+
+Infrastructure:
+├─ Docker
+├─ Eclipse Temurin JRE 17
+├─ Maven 3.6+
+└─ Python 3 (data loading)
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+                                      Notes
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+1. All microservices are stateless and can be horizontally scaled
+2. Eureka provides service discovery - services register on startup
+3. Feign clients use service names (logical) not hardcoded URLs
+4. YugabyteDB provides both SQL and NoSQL APIs in a single cluster
+5. API Gateway aggregates responses to reduce client round trips
+6. React UI acts as both frontend host and Backend for Frontend (BFF)
+7. Current demo uses fixed user ID ("u1001") - authentication WIP
+8. Checkout service orchestrates multi-service transaction flow
+9. YCQL transactions enabled for orders and inventory tables
+10. System designed for cloud-native deployment (Kubernetes, multi-region)
+
+═══════════════════════════════════════════════════════════════════════════════════════════
