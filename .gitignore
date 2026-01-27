@@ -30,3 +30,22 @@ package-lock.json
 .env
 .vscode/
 *.dylib
+
+# Authentication & Security
+application-secrets.yml
+application-secrets.properties
+application-local.yml
+application-local.properties
+*.jwt
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+jwt-secret.txt
+auth-tokens/
+session-store/
+.env.local
+.env.production
+*-credentials.json
+*-auth.properties

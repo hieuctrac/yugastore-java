@@ -1,5 +1,181 @@
 spring:
   application:
     name: api-gateway-microservice
+
+  # Cloud Gateway Configuration
+  cloud:
+    gateway:
+      # Global CORS configuration
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"    # React development server
+              - "http://localhost:8080"    # YugaStore UI
+              - "https://yugastore-ui.cfapps.io"  # Production UI
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowedHeaders:
+              - "*"
+            allowCredentials: true
+            maxAge: 3600
+
+      # Route definitions for microservices
+      routes:
+        # Authentication routes (login-microservice)
+        - id: auth-routes
+          uri: lb://login-microservice
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=1
+
+        # Product routes (products-microservice) - Public access
+        - id: product-routes
+          uri: lb://products-microservice
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - StripPrefix=1
+
+        # Cart routes (cart-microservice) - Authenticated access
+        - id: cart-routes
+          uri: lb://cart-microservice
+          predicates:
+            - Path=/api/cart/**
+          filters:
+            - StripPrefix=1
+
+        # Checkout routes (checkout-microservice) - Authenticated access
+        - id: checkout-routes
+          uri: lb://checkout-microservice
+          predicates:
+            - Path=/api/checkout/**
+          filters:
+            - StripPrefix=1
+
+        # Admin routes - Admin access only
+        - id: admin-routes
+          uri: lb://login-microservice
+          predicates:
+            - Path=/api/admin/**
+          filters:
+            - StripPrefix=1
+
+        # Support routes - Support/Admin access
+        - id: support-routes
+          uri: lb://login-microservice
+          predicates:
+            - Path=/api/support/**
+          filters:
+            - StripPrefix=1
+
+      # Default filters applied to all routes
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin
+        - AddResponseHeader=X-Frame-Options, DENY
+        - AddResponseHeader=X-Content-Type-Options, nosniff
+        - AddResponseHeader=X-XSS-Protection, 1; mode=block
+        - AddResponseHeader=Referrer-Policy, strict-origin-when-cross-origin
+
+  # Security Configuration
+  security:
+    # Basic authentication disabled for JWT-based auth
+    basic:
+      enabled: false
+
+    # Session management - stateless for JWT
+    sessions: stateless
+
+# JWT Configuration (must match login-microservice)
+jwt:
+  # JWT Secret Key - MUST be the same as login-microservice
+  secret: ${JWT_SECRET:YugaStore_RBAC_JWT_Secret_2026_CHANGE_IN_PRODUCTION_256bit_minimum}
+
+  # JWT Issuer - must match login-microservice
+  issuer: ${JWT_ISSUER:yugastore-auth}
+
+  # Token validation settings
+  validation:
+    # Clock skew tolerance in seconds
+    clock-skew: ${JWT_CLOCK_SKEW:300}
+
+    # Whether to validate token expiration
+    validate-expiration: ${JWT_VALIDATE_EXPIRATION:true}
+
+# Server Configuration
 server:
   port: 8081
+
+  # Security headers
+  servlet:
+    session:
+      # Disable session management for stateless JWT
+      tracking-modes: []
+
+# Eureka Service Discovery
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+# Management and Monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      show-details: when-authorized
+    gateway:
+      enabled: true
+
+# Logging Configuration
+logging:
+  level:
+    org.springframework.cloud.gateway: ${GATEWAY_LOG_LEVEL:INFO}
+    security: ${SECURITY_LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
+    com.yugabyte.app.yugastore: ${APP_LOG_LEVEL:INFO}
+    root: INFO
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%logger{36}] - %msg%n"
+
+# YugaStore specific configuration
+yugastore:
+  # RBAC settings
+  rbac:
+    # Enable RBAC enforcement
+    enabled: ${RBAC_ENABLED:true}
+
+    # Admin user creation on startup (for initial setup)
+    admin:
+      create-on-startup: ${CREATE_ADMIN_ON_STARTUP:false}
+      username: ${ADMIN_USERNAME:admin}
+      email: ${ADMIN_EMAIL:admin@yugastore.com}
+      password: ${ADMIN_PASSWORD:}  # Must be set via environment variable
+
+  # Rate limiting configuration
+  rate-limiting:
+    enabled: ${RATE_LIMITING_ENABLED:true}
+    requests-per-second: ${RATE_LIMIT_RPS:100}
+    burst-capacity: ${RATE_LIMIT_BURST:200}
+
+  # API versioning
+  api:
+    version: ${API_VERSION:v1}
+    base-path: ${API_BASE_PATH:/api}
