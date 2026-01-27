@@ -1,4 +1,7 @@
 spring:
+  application:
+    name: login-microservice
+
   jpa:
     database: postgresql
     hibernate:
@@ -10,10 +13,19 @@ spring:
     jpa:
       repositories:
         enabled: true
+
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5433/postgres
-    username: postgres
-    password: ""
+    url: jdbc:postgresql://127.0.0.1:5433/yugabyte
+    username: ${DB_USERNAME:yugabyte}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+
+  # Security Configuration
+  security:
+    # Password encoding strength (bcrypt rounds)
+    password:
+      strength: ${PASSWORD_STRENGTH:12}
+
   messages:
     basename: validation
   mvc:
@@ -21,9 +33,37 @@ spring:
       prefix: /
       suffix: .jsp
 
+  # Session management (stateless for JWT)
+  session:
+    store-type: none
+
 yugastore:
   redirect:
     url: https://yugastore-ui.cfapps.io
+
+# JWT Configuration for RBAC Authentication
+jwt:
+  # JWT Secret Key - MUST be changed in production environments
+  # This should be at least 256 bits (32 characters) for HS256 algorithm
+  secret: ${JWT_SECRET:YugaStore_RBAC_JWT_Secret_2026_CHANGE_IN_PRODUCTION_256bit_minimum}
+
+  # Token expiration times (in seconds)
+  expiration: ${JWT_EXPIRATION:86400}         # 24 hours for access tokens
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800}  # 7 days for refresh tokens
+
+  # JWT Issuer identification
+  issuer: ${JWT_ISSUER:yugastore-auth}
+
+  # Token cleanup and security settings
+  cleanup:
+    # How often to clean up expired tokens from database (in seconds)
+    interval: ${JWT_CLEANUP_INTERVAL:3600}    # Every hour
+
+    # Maximum number of active sessions per user (0 = unlimited)
+    max-sessions-per-user: ${JWT_MAX_SESSIONS:5}
+
+    # Whether to invalidate other sessions when user logs in from new device
+    single-session-mode: ${JWT_SINGLE_SESSION:false}
 
 server:
   port: 8085

@@ -8,7 +8,10 @@
       "Bash(gh api:*)",
       "Bash(git checkout:*)",
       "Bash(git fetch:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(mvn test:*)"
     ]
   }
 }

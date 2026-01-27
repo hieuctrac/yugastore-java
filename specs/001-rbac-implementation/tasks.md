@@ -23,8 +23,8 @@
 
 **Purpose**: Project initialization and basic structure preparation
 
-- [ ] T001 [P] Add JWT dependency (io.jsonwebtoken:jjwt:0.11.5) to all service pom.xml files
-- [ ] T002 [P] Create auth database schema file in resources/auth-schema.sql
+- [x] T001 [P] Add JWT dependency (io.jsonwebtoken:jjwt:0.11.5) to all service pom.xml files
+- [x] T002 [P] Create auth database schema file in resources/auth-schema.sql
 - [ ] T003 [P] Update .gitignore to exclude authentication tokens and sensitive config files
 - [ ] T004 [P] Create migration scripts directory in resources/migration-scripts/
 
