@@ -1575,6 +1575,7 @@ git diff --staged
 - **Architecture:** [architecture.md](architecture.md)
 - **Business Requirements:** [business-requirements.md](business-requirements.md)
 - **Delivery Guide:** [delivery-guide.md](delivery-guide.md)
+- **Coding Standards:** [coding-standards.md](coding-standards.md) ⭐ NEW - Idiomatic standards for code generation and reviews
 
 ### External Resources
 
