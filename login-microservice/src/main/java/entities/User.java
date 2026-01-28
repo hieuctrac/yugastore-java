@@ -24,7 +24,7 @@ import java.util.UUID;
 @Table(name = "users", indexes = {
     @Index(name = "idx_users_email", columnList = "email"),
     @Index(name = "idx_users_username", columnList = "username"),
-    @Index(name = "idx_users_active", columnList = "isActive")
+    @Index(name = "idx_users_active", columnList = "is_active")
 })
 public class User {
 
