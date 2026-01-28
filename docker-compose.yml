@@ -1,0 +1,186 @@
+services:
+  # YugabyteDB Database
+  yugabytedb:
+    image: yugabytedb/yugabyte:latest
+    container_name: yugastore-db
+    ports:
+      - "5433:5433"  # YSQL (PostgreSQL) API
+      - "9042:9042"  # YCQL (Cassandra) API
+      - "15433:15433" # YSQL Admin UI
+      - "9000:9000"  # Master Admin UI
+    command: ["bin/yugabyted", "start", "--daemon=false", "--ui=false"]
+    environment:
+      - YSQL_USER=postgres
+      - YSQL_PASSWORD=postgres
+    volumes:
+      - yugastore_data:/home/yugabyte/yb_data
+    healthcheck:
+      test: ["CMD", "bin/yugabyted", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - yugastore-network
+
+  # Database initialization service
+  db-init:
+    image: yugabytedb/yugabyte:latest
+    container_name: yugastore-db-init
+    depends_on:
+      yugabytedb:
+        condition: service_healthy
+    volumes:
+      - ./resources:/scripts
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        sleep 10 &&
+        echo 'Initializing database schemas...' &&
+        /home/yugabyte/bin/ysqlsh -h yugabytedb -p 5433 -U postgres -d postgres -f /scripts/schema.sql &&
+        echo 'Creating keyspace for Cassandra API...' &&
+        /home/yugabyte/bin/ycqlsh yugabytedb -f /scripts/schema.cql &&
+        echo 'Database initialization completed!'
+      "
+    networks:
+      - yugastore-network
+
+  # Eureka Service Discovery
+  eureka-server:
+    build:
+      context: ./eureka-server-local
+      dockerfile: Dockerfile
+    container_name: yugastore-eureka
+    ports:
+      - "8761:8761"
+    environment:
+      - SERVER_PORT=8761
+    networks:
+      - yugastore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Login Microservice (Authentication & RBAC)
+  login-service:
+    build:
+      context: ./login-microservice
+      dockerfile: Dockerfile
+    container_name: yugastore-login
+    ports:
+      - "8085:8085"
+    environment:
+      - SERVER_PORT=8085
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://yugabytedb:5433/postgres
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      yugabytedb:
+        condition: service_healthy
+    networks:
+      - yugastore-network
+    restart: on-failure
+
+  # Products Microservice
+  products-service:
+    build:
+      context: ./products-microservice
+      dockerfile: Dockerfile
+    container_name: yugastore-products
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVER_PORT=8082
+      - CRONOS_YUGABYTE_HOSTNAME=yugabytedb
+      - CRONOS_YUGABYTE_PORT=9042
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      yugabytedb:
+        condition: service_healthy
+    networks:
+      - yugastore-network
+    restart: on-failure
+
+  # Cart Microservice
+  cart-service:
+    build:
+      context: ./cart-microservice
+      dockerfile: Dockerfile
+    container_name: yugastore-cart
+    ports:
+      - "8083:8083"
+    environment:
+      - SERVER_PORT=8083
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - yugastore-network
+    restart: on-failure
+
+  # Checkout Microservice
+  checkout-service:
+    build:
+      context: ./checkout-microservice
+      dockerfile: Dockerfile
+    container_name: yugastore-checkout
+    ports:
+      - "8086:8086"
+    environment:
+      - SERVER_PORT=8086
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - yugastore-network
+    restart: on-failure
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway-microservice
+      dockerfile: Dockerfile
+    container_name: yugastore-gateway
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - yugastore-network
+    restart: on-failure
+
+  # React UI
+  react-ui:
+    build:
+      context: ./react-ui
+      dockerfile: Dockerfile
+    container_name: yugastore-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - REACT_APP_API_URL=http://localhost:8081
+    depends_on:
+      - api-gateway
+    networks:
+      - yugastore-network
+    restart: on-failure
+
+volumes:
+  yugastore_data:
+
+networks:
+  yugastore-network:
+    driver: bridge
