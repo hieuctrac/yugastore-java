@@ -9,21 +9,21 @@ WORKDIR /app
 
 # Copy pom files for dependency resolution
 COPY pom.xml ./
-COPY eureka-server-local/pom.xml ./eureka-server-local/
+COPY login-microservice/pom.xml ./login-microservice/
 
 # Copy source code
-COPY eureka-server-local/src ./eureka-server-local/src
+COPY login-microservice/src ./login-microservice/src
 
 # Build the application
-RUN mvn clean package -pl eureka-server-local -am -DskipTests
+RUN mvn clean package -pl login-microservice -am -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
 # Copy built JAR from builder stage
-COPY --from=builder /app/eureka-server-local/target/eureka-server-local-0.0.1-SNAPSHOT.jar /app.jar
+COPY --from=builder /app/login-microservice/target/login-microservice-0.0.1-SNAPSHOT.jar /app.jar
 
-EXPOSE 8761
+EXPOSE 8085
 
 # Run with environment variable support
 CMD ["java", "-jar", "/app.jar"]
