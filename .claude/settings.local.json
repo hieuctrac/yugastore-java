@@ -12,7 +12,11 @@
       "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
       "Bash(git rev-parse:*)",
       "Bash(mvn test:*)",
-      "Bash(gh pr view:*)"
+      "Bash(gh pr view:*)",
+      "Bash(.specify/scripts/bash/memory-status.sh:*)",
+      "Bash(.specify/scripts/bash/memory-export.sh:*)",
+      "Bash(.specify/scripts/bash/setup-memory-banking.sh:*)",
+      "Bash(.specify/scripts/bash/update-agent-context.sh:*)"
     ]
   }
 }
