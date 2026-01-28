@@ -7,21 +7,18 @@ RUN apt-get update && apt-get install -y maven
 # Set working directory
 WORKDIR /app
 
-# Copy pom files for dependency resolution
+# Copy pom file and source code (build context is products-microservice)
 COPY pom.xml ./
-COPY products-microservice/pom.xml ./products-microservice/
-
-# Copy source code
-COPY products-microservice/src ./products-microservice/src
+COPY src ./src
 
 # Build the application
-RUN mvn clean package -pl products-microservice -am -DskipTests
+RUN mvn clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
 # Copy built JAR from builder stage
-COPY --from=builder /app/products-microservice/target/products-microservice-0.0.1-SNAPSHOT.jar /app.jar
+COPY --from=builder /app/target/products-microservice-0.0.1-SNAPSHOT.jar /app.jar
 
 EXPOSE 8082
 

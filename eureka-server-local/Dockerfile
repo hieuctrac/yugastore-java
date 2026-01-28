@@ -7,21 +7,18 @@ RUN apt-get update && apt-get install -y maven
 # Set working directory
 WORKDIR /app
 
-# Copy pom files for dependency resolution
+# Copy pom file and source code (build context is eureka-server-local)
 COPY pom.xml ./
-COPY eureka-server-local/pom.xml ./eureka-server-local/
-
-# Copy source code
-COPY eureka-server-local/src ./eureka-server-local/src
+COPY src ./src
 
 # Build the application
-RUN mvn clean package -pl eureka-server-local -am -DskipTests
+RUN mvn clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
 # Copy built JAR from builder stage
-COPY --from=builder /app/eureka-server-local/target/eureka-server-local-0.0.1-SNAPSHOT.jar /app.jar
+COPY --from=builder /app/target/eureka-server-local-0.0.1-SNAPSHOT.jar /app.jar
 
 EXPOSE 8761
 

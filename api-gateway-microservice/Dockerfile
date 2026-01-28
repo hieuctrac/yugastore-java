@@ -7,21 +7,18 @@ RUN apt-get update && apt-get install -y maven
 # Set working directory
 WORKDIR /app
 
-# Copy pom files for dependency resolution
+# Copy pom file and source code (build context is api-gateway-microservice)
 COPY pom.xml ./
-COPY api-gateway-microservice/pom.xml ./api-gateway-microservice/
-
-# Copy source code
-COPY api-gateway-microservice/src ./api-gateway-microservice/src
+COPY src ./src
 
 # Build the application
-RUN mvn clean package -pl api-gateway-microservice -am -DskipTests
+RUN mvn clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:17-jre
 
 # Copy built JAR from builder stage
-COPY --from=builder /app/api-gateway-microservice/target/api-gateway-microservice-0.0.1-SNAPSHOT.jar /app.jar
+COPY --from=builder /app/target/api-gateway-microservice-0.0.1-SNAPSHOT.jar /app.jar
 
 EXPOSE 8081
 
