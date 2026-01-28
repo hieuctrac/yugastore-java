@@ -1,50 +1,89 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# YugaStore Constitution
+<!-- E-commerce microservices platform with Spring Boot & YugabyteDB -->
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Microservice Independence
+Each service must be self-contained with clear domain boundaries. Services communicate only through well-defined APIs (REST/OpenFeign). No shared databases between services. Each service owns its data and business logic completely.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+**Rationale**: Enables independent deployment, scaling, and team ownership. Prevents cascading failures and tight coupling.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Polyglot Persistence Strategy
+Use YSQL (PostgreSQL-compatible) for transactional data requiring ACID properties. Use YCQL (Cassandra-compatible) for high-scale, read-heavy workloads. Match database choice to data access patterns, not convenience.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Current mapping**:
+- Cart, Login, Admin: YSQL (transactional integrity)
+- Products, Checkout, Orders: YCQL (scale and performance)
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Security-First Design (NON-NEGOTIABLE)
+JWT-based authentication with proper RBAC. All endpoints secured by default - explicit @PreAuthorize annotations required. Input validation at service boundaries. Audit logging for all admin operations. Never trust client-side validation alone.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### IV. Observability & Monitoring
+Spring Actuator endpoints enabled on all services. Structured logging with correlation IDs for request tracing. Health checks must reflect actual service health, not just "UP". Monitor both technical metrics and business metrics.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### V. API-First Development
+OpenAPI specifications before implementation. Contract testing between services. Versioning strategy for breaking changes (prefer additive changes). Error responses follow consistent JSON structure across all services.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Technology Standards
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### Required Stack
+- **Language**: Java 17 (LTS)
+- **Framework**: Spring Boot 2.6.3, Spring Cloud 2021.0.0
+- **Database**: YugabyteDB (YSQL + YCQL as appropriate)
+- **Service Discovery**: Netflix Eureka
+- **API Gateway**: Spring Cloud Gateway
+- **Authentication**: JWT with Spring Security
+- **Build Tool**: Maven with Spring Boot parent
+
+### Approved Libraries
+- Jackson for JSON processing
+- Spring Data JPA (for YSQL services)
+- Spring Data Cassandra (for YCQL services)
+- OpenFeign for inter-service communication
+- Spring Boot Actuator for monitoring
+- Hibernate Validator for input validation
+
+### Technology Constraints
+- No direct database connections between services
+- No synchronous calls in critical user flows (prefer async where possible)
+- No business logic in controllers (use service layer)
+- No SQL queries in controllers (use repository/service layer)
+
+## Development Workflow
+
+### Feature Development Process
+1. **Specification**: Use `/specify` to capture requirements and user scenarios
+2. **Planning**: Use `/plan` to design implementation approach
+3. **Task Breakdown**: Use `/tasks` to create actionable work items
+4. **Implementation**: Follow TDD where feasible, test API contracts
+5. **Documentation**: Update service README and API documentation
+
+### Code Review Requirements
+- All changes require spec-driven development (spec.md exists)
+- JWT security implications reviewed for auth-related changes
+- Database schema changes reviewed for YSQL/YCQL appropriateness
+- Inter-service API changes require contract validation
+- Performance implications considered for high-volume endpoints (products, cart)
+
+### Quality Gates
+- Unit tests for business logic
+- Integration tests for API endpoints
+- Contract tests for inter-service communication
+- Security validation for authentication/authorization changes
+- Performance testing for database query changes
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes individual preferences and must be followed for all changes. Amendments require:
+1. Documented justification with technical reasoning
+2. Impact assessment on existing services
+3. Team consensus and update to this document
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Special Considerations**:
+- YugabyteDB-specific optimizations take precedence over generic patterns
+- E-commerce domain requirements (inventory, pricing, cart) override general web app patterns
+- Security requirements are non-negotiable due to customer data handling
+
+Use this constitution as the definitive guide for architectural decisions. When in doubt, choose the approach that maintains service independence and security.
+
+**Version**: 1.0.0 | **Ratified**: 2026-01-27 | **Last Amended**: 2026-01-27
