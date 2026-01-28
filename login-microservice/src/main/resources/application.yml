@@ -1,6 +1,8 @@
 spring:
   application:
     name: login-microservice
+  main:
+    allow-bean-definition-overriding: true
 
   jpa:
     database: postgresql

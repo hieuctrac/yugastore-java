@@ -12,7 +12,10 @@
       "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
       "Bash(git rev-parse:*)",
       "Bash(mvn test:*)",
-      "Bash(gh pr view:*)"
+      "Bash(gh pr view:*)",
+      "Bash(./run-local.sh)",
+      "Bash(docker-compose:*)",
+      "Bash(git stash:*)"
     ]
   }
 }
