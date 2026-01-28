@@ -1,0 +1,95 @@
+.admin-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 30px;
+  background-color: #343a40;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admin-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-role {
+  padding: 2px 8px;
+  background-color: #007bff;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.admin-content {
+  display: flex;
+  flex: 1;
+}
+
+.admin-main {
+  flex: 1;
+  padding: 30px;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-outline-light {
+  color: white;
+  border: 1px solid white;
+  background: transparent;
+}
+
+.btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
