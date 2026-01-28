@@ -8,9 +8,10 @@ If you're using this demo app, please :star: this repository to show your suppor
 
 ## Key Features
 
-- **Microservices Architecture**: 6 independent Spring Boot services with Eureka service discovery
+- **Microservices Architecture**: 7 independent Spring Boot services with Eureka service discovery
 - **Polyglot Persistence**: Demonstrates both YSQL (PostgreSQL-compatible) and YCQL (Cassandra-compatible) APIs
 - **Modern UI**: React-based responsive frontend with Bootstrap styling
+- **Admin Portal**: Role-based product management with JWT authentication and audit logging
 - **Real Product Data**: Over 6,000 products with categories, ratings, and recommendations
 - **Production Patterns**: API gateway, service registry, distributed transactions, and container deployment
 
@@ -42,8 +43,9 @@ YugaStore implements a microservices architecture with clear separation of conce
 | **[API Gateway](api-gateway-microservice/)** | - | [8081](http://localhost:8081) | Central entry point for all external requests. Routes and aggregates calls to backend microservices. Only service the UI communicates with directly. |
 | **[Products](products-microservice/)** | YCQL | [8082](http://localhost:8082) | Product catalog service. Manages product information, categories, rankings, and recommendations. Uses Cassandra-compatible YCQL API for high-read performance. |
 | **[Cart](cart-microservice/)** | YSQL | [8083](http://localhost:8083) | Shopping cart management. Handles add/remove items and cart state. Uses PostgreSQL-compatible YSQL API with JPA for ACID transactions. |
-| **[Checkout](checkout-microservice/)** | YCQL | [8086](http://localhost:8086) | Order processing and inventory management. Handles order placement and stock verification using YCQL with transactions enabled. |
+| **[Admin Portal](admin-microservice/)** | YSQL + YCQL | [8084](http://localhost:8084) | Admin portal for product management. Role-based access control (Admin/Editor/Viewer), JWT authentication, audit logging. Uses YSQL for admin users and audit logs, YCQL for product catalog access. |
 | **[Login](login-microservice/)** | YSQL | [8085](http://localhost:8085) | User authentication service. Manages user credentials and sessions using YSQL. *(In development)* |
+| **[Checkout](checkout-microservice/)** | YCQL | [8086](http://localhost:8086) | Order processing and inventory management. Handles order placement and stock verification using YCQL with transactions enabled. |
 
 ### Database Schema
 
@@ -55,6 +57,8 @@ YugaStore implements a microservices architecture with clear separation of conce
 
 **YSQL (PostgreSQL-compatible) Tables:**
 - `shopping_cart` - User cart items with quantities and timestamps
+- `admin_users` - Admin portal user accounts with role-based access control
+- `product_audit_log` - Audit trail for all product changes made through admin portal
 
 ## Quick Start
 
@@ -256,12 +260,80 @@ eureka:
 
 ---
 
+## Admin Portal
+
+YugaStore now includes an **Admin Portal** for managing the product catalog through a secure web interface. The admin portal provides role-based access control with three user roles:
+
+### Features
+
+- **JWT Authentication**: Secure token-based authentication with 30-minute session timeout
+- **Role-Based Access Control**:
+  - **ADMIN**: Full access - create, read, update, delete products
+  - **EDITOR**: Create and update products (cannot delete)
+  - **VIEWER**: Read-only access to products and audit logs
+- **Audit Logging**: Complete audit trail of all product changes
+- **Product Management**: Search, create, update, deactivate, and delete products
+- **Dual Database**: YSQL for admin users/audit logs, YCQL for product catalog
+
+### Quick Start
+
+1. **Initialize admin database schema**:
+```bash
+psql -h 127.0.0.1 -p 5433 -U yugabyte -d yugabyte \
+  -f admin-microservice/src/main/resources/schema-admin.sql
+```
+
+2. **Create default admin users**:
+```bash
+psql -h 127.0.0.1 -p 5433 -U yugabyte -d yugabyte \
+  -f resources/seed-admin-users.sql
+```
+
+3. **Start the admin microservice**:
+```bash
+cd admin-microservice
+mvn spring-boot:run
+```
+
+4. **Access the admin portal**:
+   - URL: `http://localhost:3000/admin/login`
+   - Login: `admin` / `admin123` (default - change in production!)
+
+### Default Test Users
+
+| Username | Password   | Role   | Permissions              |
+|----------|------------|--------|--------------------------|
+| admin    | admin123   | ADMIN  | Full access              |
+| editor   | editor123  | EDITOR | Create & update only     |
+| viewer   | viewer123  | VIEWER | Read-only access         |
+
+**⚠️ WARNING**: Change these passwords before deploying to production!
+
+### API Endpoints
+
+- `POST /api/admin/auth/login` - Authenticate and get JWT token
+- `GET /api/admin/auth/me` - Get current user info
+- `POST /api/admin/auth/logout` - Logout (clear session)
+
+For complete documentation, see:
+- [Admin Portal Quick Start Guide](docs/ADMIN-PORTAL-QUICKSTART.md)
+- [Admin Microservice README](admin-microservice/README.md)
+
+### Implementation Status
+
+- ✅ **Phase 1-2 Complete**: Foundation (authentication, security, audit logging)
+- 🚧 **Phase 3-5 In Progress**: Product search, CRUD operations, bulk updates
+- 📋 **Phase 6-10 Planned**: Advanced features (deactivation, delete, history viewer)
+
+---
+
 ## Development
 
 ### Project Structure
 
 ```
 yugastore-java/
+├── admin-microservice/          # Admin portal (YSQL + YCQL, JWT auth)
 ├── api-gateway-microservice/    # API Gateway (Spring Cloud Gateway)
 ├── cart-microservice/           # Shopping cart (YSQL + JPA)
 ├── checkout-microservice/       # Order processing (YCQL + Cassandra driver)
@@ -269,13 +341,21 @@ yugastore-java/
 ├── login-microservice/          # Authentication (YSQL + JPA) [WIP]
 ├── products-microservice/       # Product catalog (YCQL + Cassandra driver)
 ├── react-ui/                    # Frontend (React + Spring Boot)
-│   └── frontend/                # React source code
+│   ├── frontend/                # React source code
+│   │   └── src/
+│   │       └── components/
+│   │           └── Admin/       # Admin portal components
 ├── resources/                   # Database schemas and data loading
 │   ├── schema.cql              # YCQL table definitions
 │   ├── schema.sql              # YSQL table definitions
+│   ├── schema-products-v2.cql  # YCQL schema extensions for admin
+│   ├── seed-admin-users.sql    # Default admin users
 │   ├── dataload.sh             # Data loading script
 │   └── parse_metadata_json.py  # JSON to CSV converter
-└── docs/                        # Documentation and business requirements
+├── docs/                        # Documentation and business requirements
+│   └── ADMIN-PORTAL-QUICKSTART.md  # Admin portal setup guide
+└── specs/                       # Feature specifications
+    └── 002-admin-portal/        # Admin portal spec and planning
 ```
 
 ### Adding New Microservices

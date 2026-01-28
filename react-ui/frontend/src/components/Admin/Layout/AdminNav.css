@@ -1,0 +1,56 @@
+.admin-nav {
+  width: 250px;
+  background-color: white;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-list li {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.nav-list li a {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  color: #333;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.nav-list li a:hover {
+  background-color: #f8f9fa;
+}
+
+.nav-list li.active a {
+  background-color: #007bff;
+  color: white;
+}
+
+.nav-icon {
+  margin-right: 10px;
+  font-size: 18px;
+}
+
+.nav-footer {
+  margin-top: auto;
+  padding: 20px;
+  border-top: 1px solid #dee2e6;
+  background-color: #f8f9fa;
+}
+
+.role-info {
+  font-size: 14px;
+  color: #666;
+}
+
+.role-info strong {
+  color: #333;
+}

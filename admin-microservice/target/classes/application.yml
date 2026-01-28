@@ -1,0 +1,62 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: admin-microservice
+
+  # YSQL Configuration (for admin_users and product_audit_log)
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5433/yugabyte
+    username: yugabyte
+    password: yugabyte
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  # YCQL Configuration (for products table access)
+  data:
+    cassandra:
+      keyspace-name: cronos
+      contact-points: 127.0.0.1
+      port: 9042
+      local-datacenter: datacenter1
+      schema-action: none
+
+server:
+  port: 8084
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:yugastore-admin-secret-key-change-in-production}
+  expiration: 1800000  # 30 minutes in milliseconds
+
+# Admin Portal Configuration
+admin:
+  session-timeout: 1800  # 30 minutes in seconds
+  max-login-attempts: 5
+  lockout-duration: 300  # 5 minutes in seconds
+
+logging:
+  level:
+    root: info
+    org.springframework.web: info
+    org.springframework.security: debug
+    org.hibernate.SQL: debug
+    com.yugabyte.app.yugastore.admin: debug
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
