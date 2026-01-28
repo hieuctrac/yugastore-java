@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y maven
 # Set working directory
 WORKDIR /app
 
-# Copy pom file and source code (build context is checkout-microservice)
+# Copy pom file and source code (build context is login-microservice)
 COPY pom.xml ./
 COPY src ./src
 
@@ -18,9 +18,9 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre
 
 # Copy built JAR from builder stage
-COPY --from=builder /app/target/checkout-microservice-0.0.1-SNAPSHOT.jar /app.jar
+COPY --from=builder /app/target/login-microservice-0.0.1-SNAPSHOT.jar /app.jar
 
-EXPOSE 8086
+EXPOSE 8085
 
 # Run with environment variable support
 CMD ["java", "-jar", "/app.jar"]

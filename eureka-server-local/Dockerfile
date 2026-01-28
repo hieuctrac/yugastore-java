@@ -1,5 +1,26 @@
+# Multi-stage build: Build stage
+FROM eclipse-temurin:17-jdk AS builder
+
+# Install Maven
+RUN apt-get update && apt-get install -y maven
+
+# Set working directory
+WORKDIR /app
+
+# Copy pom file and source code (build context is eureka-server-local)
+COPY pom.xml ./
+COPY src ./src
+
+# Build the application
+RUN mvn clean package -DskipTests
+
+# Runtime stage
 FROM eclipse-temurin:17-jre
-COPY ./target/eureka-server-local-0.0.1-SNAPSHOT.jar /
+
+# Copy built JAR from builder stage
+COPY --from=builder /app/target/eureka-server-local-0.0.1-SNAPSHOT.jar /app.jar
+
 EXPOSE 8761
-ARG ipaddr
-CMD java -jar /eureka-server-local-0.0.1-SNAPSHOT.jar --server.port=8761 --eureka.instance.preferIpAddress=true --eureka.instance.ipAddress=$ipaddr
+
+# Run with environment variable support
+CMD ["java", "-jar", "/app.jar"]

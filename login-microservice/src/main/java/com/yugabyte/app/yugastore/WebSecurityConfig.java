@@ -1,5 +1,6 @@
 package com.yugabyte.app.yugastore;
 
+import com.yugabyte.app.yugastore.web.RbacUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,17 +10,17 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @Configuration
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
-  private final UserDetailsService userDetailsService;
-  private final PasswordEncoder passwordEncoder;
+  private final RbacUserDetailsService userDetailsService;
+  private final BCryptPasswordEncoder passwordEncoder;
 
   public WebSecurityConfig(
-    UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
+    RbacUserDetailsService userDetailsService, BCryptPasswordEncoder passwordEncoder) {
     this.userDetailsService = userDetailsService;
     this.passwordEncoder = passwordEncoder;
   }
@@ -29,7 +30,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
   protected void configure(HttpSecurity http) throws Exception {
     http
       .authorizeRequests()
-      .antMatchers("/resources/**", "/registration")
+      .antMatchers("/resources/**", "/registration", "/api/auth/**")
       .permitAll()
       .anyRequest()
       .authenticated()
@@ -40,7 +41,10 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
       .and()
       .logout()
       .logoutSuccessUrl("/login")
-      .invalidateHttpSession(true);
+      .invalidateHttpSession(true)
+      .and()
+      .csrf()
+      .disable(); // Disable CSRF for API endpoints
 
   }
 
